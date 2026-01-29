@@ -1,0 +1,33 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Browser Automation (Anti-Detection)
+undetected-chromedriver
+selenium
+playwright
+playwright-stealth
+
+# HTTP Client with TLS Fingerprinting
+curl-cffi
+httpx
+
+# Database
+supabase
+postgrest
+
+# Utilities
+pydantic
+pydantic-settings
+python-dotenv
+loguru
+
+# Anti-Detection Enhancement
+fake-useragent
+pyautogui  # Human-like mouse movements
+numpy      # For Bezier curves
+
+# Background Jobs (Optional)
+celery
+redis

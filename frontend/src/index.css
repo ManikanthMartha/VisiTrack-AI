@@ -1,0 +1,254 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark theme as default - Refined Minimal */
+    --background: 220 15% 4%;
+    --foreground: 220 10% 96%;
+    --card: 220 12% 6%;
+    --card-foreground: 220 10% 96%;
+    --popover: 220 12% 6%;
+    --popover-foreground: 220 10% 96%;
+    --primary: 220 10% 96%;
+    --primary-foreground: 220 15% 4%;
+    --secondary: 220 10% 12%;
+    --secondary-foreground: 220 10% 96%;
+    --muted: 220 10% 15%;
+    --muted-foreground: 220 8% 55%;
+    --accent: 82 78% 55%;
+    --accent-foreground: 220 15% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 10% 15%;
+    --input: 220 10% 15%;
+    --ring: 82 78% 55%;
+    --radius: 0.75rem;
+    
+    /* Sidebar tokens */
+    --sidebar-background: 220 15% 5%;
+    --sidebar-foreground: 220 10% 70%;
+    --sidebar-primary: 220 10% 96%;
+    --sidebar-primary-foreground: 220 15% 4%;
+    --sidebar-accent: 220 10% 12%;
+    --sidebar-accent-foreground: 220 10% 96%;
+    --sidebar-border: 220 10% 12%;
+    --sidebar-ring: 82 78% 55%;
+    
+    /* Custom design tokens */
+    --chart-accent: 82 78% 55%;
+    --chart-positive: 142 71% 45%;
+    --chart-negative: 0 72% 51%;
+    --glow-accent: 82 78% 55% / 0.15;
+    --surface-elevated: 220 12% 8%;
+    --surface-pressed: 220 10% 10%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+  
+  /* Display font for headings */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  
+  /* Custom selection */
+  ::selection {
+    background: hsl(var(--accent) / 0.3);
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer components {
+  /* Grain overlay texture */
+  .grain-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+  
+  /* Vignette effect */
+  .vignette {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 0%, transparent 50%, hsl(var(--background) / 0.4) 100%);
+  }
+  
+  /* Card with inner glow */
+  .card-glow {
+    position: relative;
+    background: hsl(var(--card));
+    border-radius: calc(var(--radius) + 4px);
+    border: 1px solid hsl(var(--border));
+  }
+  
+  .card-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(var(--accent) / 0.1) 0%, transparent 50%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  
+  /* Subtle shadow elevation */
+  .shadow-elevated {
+    box-shadow: 
+      0 1px 2px hsl(var(--background) / 0.3),
+      0 4px 12px hsl(var(--background) / 0.2),
+      0 8px 24px hsl(var(--background) / 0.1);
+  }
+  
+  /* Hover lift effect */
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 4px 8px hsl(var(--background) / 0.3),
+      0 8px 24px hsl(var(--background) / 0.2);
+  }
+  
+  /* Accent text gradient */
+  .text-accent-gradient {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(142 71% 55%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  /* Sparkline animation */
+  @keyframes sparkline-draw {
+    from {
+      stroke-dashoffset: 100;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  .sparkline-animate {
+    stroke-dasharray: 100;
+    animation: sparkline-draw 1.5s ease-out forwards;
+  }
+  
+  /* Staggered fade in */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+  
+  /* Pulse glow for active states */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(var(--accent) / 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 4px hsl(var(--accent) / 0);
+    }
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+  
+  /* Focus ring */
+  .focus-ring:focus-visible {
+    outline: none;
+    ring: 2px;
+    ring-offset: 2px;
+    ring-color: hsl(var(--accent));
+    ring-offset-color: hsl(var(--background));
+  }
+  
+  /* Number font for metrics */
+  .font-mono-numbers {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+@layer utilities {
+  /* Animation delays for staggered reveals */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  
+  /* Text balance for headings */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* GPU acceleration */
+  .gpu {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+}

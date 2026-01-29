@@ -1,0 +1,151 @@
+"""
+Perplexity scraper using undetected-chromedriver for anti-detection
+"""
+import time
+from loguru import logger
+from app.scrapers.base_scraper import BaseScraper
+from app.config import settings
+
+
+class PerplexityScraper(BaseScraper):
+    """
+    Perplexity scraper using undetected-chromedriver
+    
+    Inherits all browser management, cookie handling, and brand detection
+    from BaseScraper. Only implements Perplexity-specific response handling.
+    """
+    
+    # Platform-specific selectors
+    URL = 'https://www.perplexity.ai'
+    LOGIN_SELECTOR = 'div[contenteditable="true"][id="ask-input"]'
+    INPUT_SELECTOR = 'div[contenteditable="true"][id="ask-input"]'
+    SEND_BUTTON_SELECTOR = 'button[aria-label="Submit"]'
+    RESPONSE_SELECTOR = 'div[id^="markdown-content-"] .prose'
+    
+    def __init__(self):
+        super().__init__('perplexity')
+    
+    def _wait_for_response(self):
+        """Wait for Perplexity to finish generating response"""
+        if not self.driver:
+            raise RuntimeError("Driver not initialized")
+            
+        self.delay(3)  # Initial delay for response to start
+        
+        logger.info("⏳ Waiting for Perplexity to finish responding...")
+        max_wait = 120  # 2 minutes max
+        start_time = time.time()
+        
+        while (time.time() - start_time) < max_wait:
+            try:
+                # Check for response container with markdown content
+                response_containers = self.driver.find_elements(
+                    "css selector",
+                    'div[id^="markdown-content-"]'
+                )
+                
+                if response_containers:
+                    # Check if response has actual content (not just placeholder)
+                    has_content = self.driver.execute_script("""
+                        const containers = document.querySelectorAll('div[id^="markdown-content-"]');
+                        if (containers.length === 0) return false;
+                        
+                        const lastContainer = containers[containers.length - 1];
+                        const prose = lastContainer.querySelector('.prose');
+                        if (!prose) return false;
+                        
+                        const text = prose.textContent || prose.innerText || '';
+                        return text.trim().length > 10; // More than just a greeting
+                    """)
+                    
+                    if has_content:
+                        logger.success("✅ Response generation complete!")
+                        break
+                    
+                    logger.debug("⏳ Still generating...")
+                    self.delay(2)
+                else:
+                    logger.debug("⏳ Waiting for response to appear...")
+                    self.delay(1)
+                    
+            except Exception:
+                self.delay(1)
+        else:
+            logger.warning("⚠️ Response took too long, extracting what we have...")
+        
+        self.random_delay(1, 2)
+    
+    def _extract_response(self) -> str:
+        """Extract the full response text from Perplexity"""
+        if not self.driver:
+            raise RuntimeError("Driver not initialized")
+            
+        logger.info("📊 Extracting response text...")
+        
+        # Use JavaScript to get ALL text content from the response
+        response_text = self.driver.execute_script("""
+            // Get all markdown content containers
+            const containers = document.querySelectorAll('div[id^="markdown-content-"]');
+            
+            if (containers.length === 0) {
+                return '';
+            }
+            
+            // Get the last (most recent) response
+            const lastContainer = containers[containers.length - 1];
+            
+            // Find the prose content inside it
+            const prose = lastContainer.querySelector('.prose');
+            if (prose) {
+                // Get full innerHTML and extract all text properly
+                const clone = prose.cloneNode(true);
+                
+                // Replace <br> with newlines
+                clone.querySelectorAll('br').forEach(br => br.replaceWith('\\n'));
+                
+                // Replace block elements with newlines
+                clone.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6').forEach(el => {
+                    el.prepend(document.createTextNode('\\n'));
+                    el.append(document.createTextNode('\\n'));
+                });
+                
+                // Get text content
+                let text = clone.textContent || clone.innerText || '';
+                
+                // Clean up multiple newlines
+                text = text.replace(/\\n{3,}/g, '\\n\\n').trim();
+                
+                // Filter out generic greetings if the response is too short
+                if (text.length < 50 && (text.includes('Hi!') || text.includes('Hello') || text.includes('What\\'s up'))) {
+                    return 'No substantive response extracted';
+                }
+                
+                return text;
+            }
+            
+            return '';
+        """)
+        
+        if not response_text or response_text.strip() == '':
+            logger.warning("⚠️ Could not extract response text. Trying alternative method...")
+            
+            # Alternative method
+            try:
+                # Try to get any text from markdown containers
+                response_elements = self.driver.find_elements(
+                    "css selector",
+                    'div[id^="markdown-content-"] .prose p'
+                )
+                if response_elements:
+                    response_text = '\n'.join([el.text for el in response_elements if el.text.strip()])
+                    
+                    # Filter out short generic responses
+                    if len(response_text.strip()) < 20:
+                        response_text = 'No substantive response extracted'
+                else:
+                    response_text = 'No response extracted'
+            except Exception as e:
+                logger.error(f"Alternative extraction failed: {e}")
+                response_text = 'No response extracted'
+        
+        return response_text
