@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -14,8 +14,9 @@ import { SourcesList } from '@/components/ui-custom/SourcesList';
 import { CompetitorToggle } from '@/components/ui-custom/CompetitorToggle';
 import { PlatformBreakdown } from '@/components/ui-custom/PlatformBreakdown';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { mockApi } from '@/data/seed';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { apiClient, type BrandDetails, type LeaderboardBrand, type TimeSeriesData, type PlatformScore } from '@/lib/api';
 import type { FilterState } from '@/types';
 
 export default function CategoryPage() {
@@ -30,21 +31,149 @@ export default function CategoryPage() {
     region: 'global',
   });
 
-  const currentCategory = mockApi.getCategoryById(categoryId);
-  const categoryBrands = currentCategory ? mockApi.getBrandsByCategory(categoryId) : [];
-  const selectedBrand = selectedBrandId
-    ? mockApi.getBrandById(selectedBrandId)
-    : categoryBrands[0];
+  const [leaderboard, setLeaderboard] = useState<LeaderboardBrand[]>([]);
+  const [brandDetails, setBrandDetails] = useState<BrandDetails | null>(null);
+  const [timeseries, setTimeseries] = useState<TimeSeriesData[]>([]);
+  const [platformScores, setPlatformScores] = useState<PlatformScore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!currentCategory || !selectedBrand) {
+  // Fetch leaderboard on mount
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await apiClient.getCategoryLeaderboard(categoryId);
+        setLeaderboard(data);
+        
+        // Auto-select first brand
+        if (data.length > 0 && !selectedBrandId) {
+          setSelectedBrandId(data[0].id);
+        }
+      } catch (err) {
+        console.error('Error fetching leaderboard:', err);
+        setError('Failed to load category data. Please check if the backend is running.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [categoryId, selectedBrandId]);
+
+  // Fetch brand details when selection changes
+  useEffect(() => {
+    if (!selectedBrandId) return;
+
+    const fetchBrandData = async () => {
+      try {
+        setError(null);
+        
+        // Fetch all brand data in parallel
+        const [details, timeseriesData, platforms] = await Promise.all([
+          apiClient.getBrandDetails(selectedBrandId),
+          apiClient.getBrandTimeseries(selectedBrandId, 30),
+          apiClient.getBrandPlatformScores(selectedBrandId)
+        ]);
+
+        setBrandDetails(details);
+        setTimeseries(timeseriesData);
+        setPlatformScores(platforms);
+      } catch (err) {
+        console.error('Error fetching brand data:', err);
+        setError('Failed to load brand details.');
+      }
+    };
+
+    fetchBrandData();
+  }, [selectedBrandId]);
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Category not found</p>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full"
+        />
       </div>
     );
   }
 
-  const breadcrumbs = [{ label: currentCategory.name, href: `/category/${currentCategory.id}` }];
+  if (!brandDetails) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Brand not found</p>
+      </div>
+    );
+  }
+
+  // Transform data for components
+  const transformedLeaderboard = leaderboard.map(b => ({
+    id: b.id,
+    name: b.name,
+    logo: b.logo_url || b.name.charAt(0), // Use first letter if no logo
+    visibilityScore: b.overall_visibility_score,
+    change: 0, // TODO: Calculate from historical data
+    rank: leaderboard.findIndex(lb => lb.id === b.id) + 1
+  }));
+
+  // Transform timeseries for chart (aggregate by date across platforms)
+  const chartData = timeseries.reduce((acc, item) => {
+    const existing = acc.find(d => d.date === item.date);
+    if (existing) {
+      existing.score = Math.max(existing.score, item.daily_visibility_score);
+      existing.mentions += item.mention_count;
+    } else {
+      acc.push({
+        date: item.date,
+        score: item.daily_visibility_score,
+        mentions: item.mention_count,
+        promptCoverage: 0 // TODO: Calculate actual prompt coverage
+      });
+    }
+    return acc;
+  }, [] as { date: string; score: number; mentions: number; promptCoverage: number }[])
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Transform platform scores to object format expected by PlatformBreakdown
+  const transformedPlatformScores = platformScores.reduce((acc, p) => {
+    acc[p.ai_source as 'chatgpt' | 'gemini' | 'perplexity'] = p.platform_visibility_score;
+    return acc;
+  }, {
+    chatgpt: 0,
+    perplexity: 0,
+    claude: 0, // Not in our data yet
+    gemini: 0
+  } as { chatgpt: number; perplexity: number; claude: number; gemini: number });
+
+  // Generate dummy citations for now
+  const dummyCitations = [
+    { id: '1', url: 'https://example.com/review1', title: 'Top CRM Software Review', mentions: 15 },
+    { id: '2', url: 'https://example.com/comparison', title: 'CRM Comparison Guide', mentions: 12 },
+    { id: '3', url: 'https://example.com/blog', title: 'Best Tools for Startups', mentions: 8 }
+  ];
+
+  // Create complete brand object for BrandCard
+  const brandForCard = {
+    id: brandDetails.id,
+    name: brandDetails.name,
+    logo: brandDetails.logo_url || brandDetails.name.charAt(0),
+    description: `${brandDetails.category_name} solution`, // TODO: Add description field to DB
+    categoryId: brandDetails.category_id,
+    visibilityScore: brandDetails.overall_visibility_score,
+    citationShare: brandDetails.mention_rate, // Using mention_rate as citation share
+    promptCoverage: (brandDetails.total_mentions / Math.max(brandDetails.total_responses, 1)) * 100,
+    changePercent: 0, // TODO: Calculate from historical data
+    rank: transformedLeaderboard.findIndex(b => b.id === brandDetails.id) + 1,
+    topSources: dummyCitations,
+    timeSeriesData: chartData,
+    promptBreakdown: [], // TODO: Add prompt breakdown
+    rawResponses: [] // Not needed for display
+  };
+
+  const breadcrumbs = [{ label: brandDetails.category_name, href: `/category/${categoryId}` }];
 
   const pageVariants = {
     initial: { opacity: 0, y: 20 },
@@ -84,44 +213,45 @@ export default function CategoryPage() {
                 </Button>
               </div>
 
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <FilterBar filters={filters} onFiltersChange={setFilters} />
 
               <CompetitorToggle
-                brands={currentCategory.topBrands}
-                selectedBrandId={selectedBrand.id}
+                brands={transformedLeaderboard}
+                selectedBrandId={selectedBrandId || ''}
                 onBrandChange={setSelectedBrandId}
               />
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                  <BrandCard brand={selectedBrand} />
+                  <BrandCard brand={brandForCard} />
 
                   <VisibilityChart
-                    data={selectedBrand.timeSeriesData}
+                    data={chartData}
                     title="Brand visibility"
-                    subtitle={`Percentage of AI answers about ${currentCategory.name} that mention ${selectedBrand.name}`}
+                    subtitle={`Percentage of AI answers about ${brandDetails.category_name} that mention ${brandDetails.name}`}
                   />
-
-                  {selectedBrand.promptBreakdown.length > 0 && (
-                    <PromptHeatmap prompts={selectedBrand.promptBreakdown} />
-                  )}
                 </div>
 
                 <div className="space-y-6">
                   <Leaderboard
-                    brands={currentCategory.topBrands}
-                    selectedBrandId={selectedBrand.id}
+                    brands={transformedLeaderboard}
+                    selectedBrandId={selectedBrandId || ''}
                     onBrandClick={setSelectedBrandId}
                   />
 
-                  {currentCategory.topBrands.find(b => b.id === selectedBrand.id)?.platformScores && (
-                    <PlatformBreakdown 
-                      scores={currentCategory.topBrands.find(b => b.id === selectedBrand.id)!.platformScores!} 
-                    />
+                  {Object.keys(transformedPlatformScores).some(k => transformedPlatformScores[k as keyof typeof transformedPlatformScores] > 0) && (
+                    <PlatformBreakdown scores={transformedPlatformScores} />
                   )}
 
-                  {selectedBrand.topSources.length > 0 && (
-                    <SourcesList sources={selectedBrand.topSources} />
+                  {dummyCitations.length > 0 && (
+                    <SourcesList sources={dummyCitations} />
                   )}
                 </div>
               </div>

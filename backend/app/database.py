@@ -26,9 +26,9 @@ class Database:
     # ============= Category Operations =============
     
     async def get_categories(self) -> List[Dict[str, Any]]:
-        """Get all categories"""
+        """Get all categories with summary data (brand counts, top brands)"""
         try:
-            result = self.client.table('categories').select('*').execute()
+            result = self.client.table('category_summary').select('*').execute()
             return result.data if result.data else []
         except Exception as e:
             logger.error(f"❌ Error fetching categories: {e}")
@@ -41,6 +41,15 @@ class Database:
             return result.data if result.data else None
         except Exception as e:
             logger.error(f"❌ Error fetching category {category_id}: {e}")
+            return None
+    
+    async def get_category_summary(self, category_id: str) -> Optional[Dict[str, Any]]:
+        """Get category with summary data"""
+        try:
+            result = self.client.table('category_summary').select('*').eq('id', category_id).single().execute()
+            return result.data if result.data else None
+        except Exception as e:
+            logger.error(f"❌ Error fetching category summary {category_id}: {e}")
             return None
     
     # ============= Brand Operations =============
@@ -61,6 +70,62 @@ class Database:
         """Get all brand names for a category"""
         brands = await self.get_brands(category_id)
         return [brand['name'] for brand in brands]
+    
+    async def get_brand_details(self, brand_id: str) -> Optional[Dict[str, Any]]:
+        """Get comprehensive brand details including visibility scores"""
+        try:
+            result = self.client.table('brand_details').select('*').eq('id', brand_id).single().execute()
+            return result.data if result.data else None
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand details {brand_id}: {e}")
+            return None
+    
+    async def get_brand_timeseries(
+        self, 
+        brand_id: str, 
+        days: int = 30,
+        ai_source: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get brand visibility time-series data"""
+        try:
+            query = self.client.table('brand_visibility_timeseries')\
+                .select('*')\
+                .eq('brand_id', brand_id)\
+                .order('date', desc=False)
+            
+            if ai_source:
+                query = query.eq('ai_source', ai_source)
+            
+            result = query.execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand timeseries {brand_id}: {e}")
+            return []
+    
+    async def get_brand_platform_scores(self, brand_id: str) -> List[Dict[str, Any]]:
+        """Get brand visibility scores per platform"""
+        try:
+            result = self.client.table('brand_platform_scores')\
+                .select('*')\
+                .eq('brand_id', brand_id)\
+                .execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand platform scores {brand_id}: {e}")
+            return []
+    
+    async def get_category_leaderboard(self, category_id: str) -> List[Dict[str, Any]]:
+        """Get brand leaderboard for a category"""
+        try:
+            result = self.client.table('brand_leaderboard')\
+                .select('id, name, logo_url, overall_visibility_score, total_mentions')\
+                .eq('category_id', category_id)\
+                .order('overall_visibility_score', desc=True)\
+                .execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logger.error(f"❌ Error fetching category leaderboard {category_id}: {e}")
+            return []
     
     # ============= Prompt Operations =============
     

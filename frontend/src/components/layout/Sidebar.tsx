@@ -29,7 +29,7 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: 'Home', href: '/', icon: Home },
   { label: 'Search', href: '/search', icon: Search },
-  { label: 'Inbox', href: '/inbox', icon: Inbox },
+  // { label: 'Inbox', href: '/inbox', icon: Inbox },
 ];
 
 const metricsNavItems: NavItem[] = [

@@ -2,6 +2,7 @@
 Perplexity scraper using undetected-chromedriver for anti-detection
 """
 import time
+import random
 from loguru import logger
 from app.scrapers.base_scraper import BaseScraper
 from app.config import settings
@@ -24,6 +25,131 @@ class PerplexityScraper(BaseScraper):
     
     def __init__(self):
         super().__init__('perplexity')
+    
+    def _enter_prompt(self, input_field, prompt: str):
+        """
+        Override: Perplexity uses Lexical editor which needs special handling
+        """
+        logger.info("🖱️  Focusing on input field...")
+        
+        # Scroll into view and click
+        self.driver.execute_script("arguments[0].scrollIntoView(true);", input_field)
+        self.delay(0.5)
+        
+        # Click to focus
+        input_field.click()
+        self.delay(0.5)
+        
+        # Clear any existing content
+        try:
+            self.driver.execute_script("""
+                const editor = arguments[0];
+                editor.textContent = '';
+                editor.innerHTML = '<p><br></p>';
+                editor.focus();
+            """, input_field)
+            self.delay(0.3)
+        except Exception as e:
+            logger.debug(f"Clear content failed: {e}")
+        
+        logger.info("⌨️  Typing prompt using send_keys...")
+        
+        # Use Selenium's send_keys which triggers proper keyboard events
+        try:
+            # Focus again
+            input_field.click()
+            self.delay(0.2)
+            
+            # Type the prompt
+            input_field.send_keys(prompt)
+            
+            logger.success("✅ Finished typing prompt")
+            self.random_delay(0.5, 1)
+            
+        except Exception as e:
+            logger.error(f"❌ send_keys failed: {e}")
+            
+            # Fallback: Try ActionChains
+            logger.info("� Trying ActionChains...")
+            try:
+                from selenium.webdriver.common.action_chains import ActionChains
+                
+                actions = ActionChains(self.driver)
+                actions.move_to_element(input_field)
+                actions.click()
+                actions.pause(0.3)
+                actions.send_keys(prompt)
+                actions.perform()
+                
+                logger.success("✅ ActionChains succeeded")
+                self.random_delay(0.5, 1)
+                
+            except Exception as e2:
+                logger.error(f"❌ ActionChains also failed: {e2}")
+                raise RuntimeError("Could not enter text into Perplexity input field")
+    
+    def _send_message(self, input_field):
+        """
+        Override: Perplexity send button handling
+        """
+        logger.info("📤 Looking for send button...")
+        
+        # Wait a moment for the button to become enabled
+        self.delay(1)
+        
+        # Check if text was actually entered
+        text_content = self.driver.execute_script("""
+            const editor = arguments[0];
+            return editor.textContent || editor.innerText || '';
+        """, input_field)
+        
+        logger.info(f"📝 Text in editor: '{text_content.strip()[:50]}...'")
+        
+        if not text_content.strip():
+            logger.error("❌ No text in editor! Cannot send.")
+            raise RuntimeError("Text was not entered into the editor")
+        
+        try:
+            # Find the send button
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.webdriver.common.by import By
+            
+            send_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, self.SEND_BUTTON_SELECTOR))
+            )
+            
+            logger.info("🖱️  Clicking send button...")
+            
+            # Try multiple click methods
+            try:
+                send_button.click()
+                logger.success("✅ Clicked send button")
+            except Exception as e:
+                logger.warning(f"Regular click failed: {e}, trying JavaScript click...")
+                self.driver.execute_script("arguments[0].click();", send_button)
+                logger.success("✅ JavaScript click succeeded")
+            
+            self.delay(1)
+            
+        except Exception as e:
+            logger.error(f"❌ Could not click send button: {e}")
+            
+            # Try to find any button that might be the send button
+            logger.info("🔍 Looking for alternative send button...")
+            try:
+                buttons = self.driver.find_elements("css selector", "button")
+                for btn in buttons:
+                    aria_label = btn.get_attribute("aria-label")
+                    if aria_label and "submit" in aria_label.lower():
+                        logger.info(f"Found button with aria-label: {aria_label}")
+                        btn.click()
+                        logger.success("✅ Clicked alternative send button")
+                        return
+            except Exception as e2:
+                logger.error(f"Alternative button search failed: {e2}")
+            
+            raise RuntimeError("Could not find or click send button")
     
     def _wait_for_response(self):
         """Wait for Perplexity to finish generating response"""

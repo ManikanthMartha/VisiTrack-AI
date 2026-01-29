@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
@@ -14,11 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Grid3X3, List, Sparkles } from 'lucide-react';
+import { Search, Grid3X3, List, Sparkles, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockApi } from '@/data/seed';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth-client';
+import { apiClient, type Category } from '@/lib/api';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function HomePage() {
   const router = useRouter();
@@ -26,9 +27,39 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'brands' | 'score'>('score');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch categories from API
+  useEffect(() => {
+    // Only fetch if we have a session and we're on the client
+    if (!session || typeof window === 'undefined') return;
+    
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log('Fetching categories from:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+        const data = await apiClient.getCategories();
+        console.log('Categories fetched:', data.length);
+        
+        setCategories(data);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(`Failed to load categories: ${errorMessage}. Please check if the backend is running on http://localhost:8000`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, [session]);
 
   // Show loading state while session is being fetched
-  if (isPending) {
+  if (isPending || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div
@@ -53,16 +84,33 @@ export default function HomePage() {
     );
   }
 
-  const categories = mockApi.getCategories();
-  const filteredCategories = categories
+  // Transform API data to match CategoryCard component expectations
+  const transformedCategories = categories.map(cat => ({
+    id: cat.id,
+    name: cat.name,
+    description: cat.description || '',
+    icon: 'Users', // Default icon, could be mapped based on category
+    brandCount: cat.brand_count,
+    sparklineData: [65, 68, 70, 72, 75, 78, 80], // Dummy sparkline data for now
+    topBrands: (cat.top_brands || []).map((b, index) => ({
+      id: b.id,
+      name: b.name,
+      logo: b.logo_url || b.name.charAt(0), // Use first letter if no logo
+      visibilityScore: b.visibility_score,
+      changePercent: 0, // TODO: Calculate from historical data
+      rank: index + 1
+    }))
+  }));
+
+  const filteredCategories = transformedCategories
     .filter((c) =>
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()))
     )
     .sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'brands') return b.brandCount - a.brandCount;
-      return b.topBrands[0]?.visibilityScore - a.topBrands[0]?.visibilityScore;
+      return (b.topBrands[0]?.visibilityScore || 0) - (a.topBrands[0]?.visibilityScore || 0);
     });
 
   const handleCategoryClick = (categoryId: string) => {
@@ -109,6 +157,13 @@ export default function HomePage() {
                   </p>
                 </div>
               </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="relative flex-1 max-w-md">

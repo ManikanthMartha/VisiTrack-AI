@@ -20,7 +20,8 @@ export function Sparkline({
   strokeWidth = 1.5,
   showArea = true,
 }: SparklineProps) {
-  if (data.length < 2) return null;
+  // Safety check for undefined or invalid data
+  if (!data || !Array.isArray(data) || data.length < 2) return null;
 
   const min = Math.min(...data);
   const max = Math.max(...data);

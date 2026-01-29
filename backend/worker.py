@@ -175,7 +175,7 @@ class ScraperWorker:
                 pending_prompts = await db.get_pending_prompts(
                     ai_source=self.ai_source,
                     category_id=category_id,
-                    limit=5  # Process 5 prompts per iteration
+                    limit=15  # Process 15 prompts per iteration
                 )
                 
                 if not pending_prompts:
@@ -206,8 +206,8 @@ class ScraperWorker:
                     break
                 
                 # Wait before next iteration
-                logger.info("⏳ Iteration complete - waiting 2 minutes before next cycle...")
-                await asyncio.sleep(120)  # 2 minutes between iterations
+                logger.info("⏳ Iteration complete - waiting 1 minute before next cycle...")
+                await asyncio.sleep(60)  # 1 minute between iterations
                 
         except KeyboardInterrupt:
             logger.info("\n⚠️ Received interrupt signal")

@@ -295,16 +295,26 @@ async def get_response(response_id: str):
 
 @app.get("/categories")
 async def get_categories():
-    """Get all categories"""
+    """
+    Get all categories with summary data
+    
+    Returns:
+        List of categories with:
+        - id, name, description
+        - brand_count: number of brands in category
+        - prompt_count: number of prompts
+        - response_count: number of responses
+        - top_brands: top 5 brands with visibility scores and logos
+    """
     categories = await db.get_categories()
     return {"success": True, "data": categories}
 
 
 @app.get("/categories/{category_id}")
 async def get_category(category_id: str):
-    """Get a single category by ID"""
+    """Get a single category with summary data"""
     logger.info(f"📂 Fetching category: {category_id}")
-    category = await db.get_category(category_id)
+    category = await db.get_category_summary(category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     return {"success": True, "data": category}
@@ -334,6 +344,69 @@ async def get_category_analytics(category_id: str):
     if not analytics:
         raise HTTPException(status_code=404, detail="Category not found")
     return {"success": True, "data": analytics}
+
+
+@app.get("/categories/{category_id}/leaderboard")
+async def get_category_leaderboard(category_id: str):
+    """
+    Get brand leaderboard for a category
+    
+    Returns brands sorted by visibility score with:
+    - id, name, logo_url
+    - overall_visibility_score
+    - total_mentions
+    """
+    logger.info(f"🏆 Fetching leaderboard for category: {category_id}")
+    leaderboard = await db.get_category_leaderboard(category_id)
+    return {"success": True, "data": leaderboard}
+
+
+@app.get("/brands/{brand_id}")
+async def get_brand_details(brand_id: str):
+    """
+    Get comprehensive brand details
+    
+    Returns:
+    - Basic info: id, name, logo_url, website, category
+    - Visibility metrics: overall_visibility_score, total_mentions, mention_rate
+    """
+    logger.info(f"🏷️  Fetching brand details: {brand_id}")
+    brand = await db.get_brand_details(brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    return {"success": True, "data": brand}
+
+
+@app.get("/brands/{brand_id}/timeseries")
+async def get_brand_timeseries(
+    brand_id: str,
+    days: int = 30,
+    ai_source: str = None # type: ignore
+):
+    """
+    Get brand visibility time-series data
+    
+    Query Parameters:
+    - days: Number of days to fetch (default: 30)
+    - ai_source: Filter by AI platform (optional)
+    
+    Returns daily visibility scores for charting
+    """
+    logger.info(f"📈 Fetching timeseries for brand: {brand_id} (days={days}, ai_source={ai_source})")
+    timeseries = await db.get_brand_timeseries(brand_id, days, ai_source)
+    return {"success": True, "data": timeseries}
+
+
+@app.get("/brands/{brand_id}/platforms")
+async def get_brand_platform_scores(brand_id: str):
+    """
+    Get brand visibility scores per AI platform
+    
+    Returns visibility scores for ChatGPT, Gemini, Perplexity
+    """
+    logger.info(f"🤖 Fetching platform scores for brand: {brand_id}")
+    scores = await db.get_brand_platform_scores(brand_id)
+    return {"success": True, "data": scores}
 
 
 @app.post("/scrape/prompt", response_model=QueryResponse)

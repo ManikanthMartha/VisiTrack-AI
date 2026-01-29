@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     OXYLABS_PROXY_PORTS: str = "8001,8002,8003,8004,8005"
     USE_PROXY: bool = True  # MUST be True to use proxies
     
+    # Google AI Studio API Key (for LLM-powered extraction)
+    GOOGLE_API_KEY: str = ""
+    
+    # LLM Settings
+    LLM_ENABLED: bool = True  # Toggle LLM extraction
+    LLM_MODEL: str = "gemini-1.5-flash"  # Fast & free model
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
