@@ -46,9 +46,9 @@ export default function LoginPage() {
       if (result.data && result.data.user) {
         setSuccess(true);
         // Redirect after showing success message
+        // Use window.location for a full page reload to ensure cookies are properly read
         setTimeout(() => {
-          router.push('/');
-          router.refresh(); // Refresh to update session
+          window.location.href = '/';
         }, 1000);
       } else if (result.error) {
         setError(result.error.message || 'Invalid email or password');
@@ -57,8 +57,7 @@ export default function LoginPage() {
         // Fallback: redirect immediately if no error
         setSuccess(true);
         setTimeout(() => {
-          router.push('/');
-          router.refresh();
+          window.location.href = '/';
         }, 1000);
       }
     } catch (err: any) {

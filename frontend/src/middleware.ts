@@ -9,7 +9,10 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
   
   // Check for session token in cookies (Better Auth uses this cookie name)
-  const sessionToken = request.cookies.get('better-auth.session_token')?.value;
+  // In production (HTTPS), the cookie is prefixed with __Secure-
+  const sessionToken = 
+    request.cookies.get('__Secure-better-auth.session_token')?.value ||
+    request.cookies.get('better-auth.session_token')?.value;
   
   // If user is not authenticated and trying to access protected route (including root)
   if (!sessionToken && !isPublicRoute) {
