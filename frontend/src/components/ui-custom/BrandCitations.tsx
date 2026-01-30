@@ -84,15 +84,18 @@ export function BrandCitations({ citations, isLoading }: BrandCitationsProps) {
                   <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary flex-shrink-0 mt-0.5" />
                 </a>
                 
-                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                  <span>
-                    <span className="font-semibold text-foreground">{citation.citation_count}</span> citations
+                <div className="flex items-center gap-4 mt-2 text-xs">
+                  <span className="flex items-center gap-1 font-semibold text-primary">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                    {citation.citation_count} {citation.citation_count === 1 ? 'mention' : 'mentions'}
                   </span>
-                  <span>
-                    Avg position: <span className="font-semibold text-foreground">{citation.avg_position.toFixed(1)}</span>
+                  <span className="text-muted-foreground">
+                    in {citation.response_count} {citation.response_count === 1 ? 'response' : 'responses'}
                   </span>
-                  <span>
-                    <span className="font-semibold text-foreground">{citation.response_count}</span> responses
+                  <span className="text-muted-foreground">
+                    Avg position: <span className="font-medium text-foreground">{citation.avg_position.toFixed(1)}</span>
                   </span>
                 </div>
               </div>
