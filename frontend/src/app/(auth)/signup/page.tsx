@@ -46,18 +46,34 @@ export default function SignupPage() {
     }
 
     try {
-      await signUp.email({
+      const result = await signUp.email({
         email,
         password,
         name,
       });
       
-      setSuccess(true);
-      setTimeout(() => {
-        router.push('/');
-      }, 1000);
-    } catch (err) {
-      setError('Failed to create account. Email may already be in use.');
+      // Check if sign-up was successful
+      if (result.data && result.data.user) {
+        setSuccess(true);
+        // Redirect after showing success message
+        setTimeout(() => {
+          router.push('/');
+          router.refresh(); // Refresh to update session
+        }, 1000);
+      } else if (result.error) {
+        setError(result.error.message || 'Failed to create account. Email may already be in use.');
+        setIsLoading(false);
+      } else {
+        // Fallback: redirect immediately if no error
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/');
+          router.refresh();
+        }, 1000);
+      }
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setError(err?.message || 'Failed to create account. Email may already be in use.');
       setIsLoading(false);
     }
   };

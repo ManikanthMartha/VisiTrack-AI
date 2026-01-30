@@ -37,17 +37,33 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await signIn.email({
+      const result = await signIn.email({
         email,
         password,
       });
       
-      setSuccess(true);
-      setTimeout(() => {
-        router.push('/');
-      }, 1000);
-    } catch (err) {
-      setError('Invalid email or password');
+      // Check if sign-in was successful
+      if (result.data && result.data.user) {
+        setSuccess(true);
+        // Redirect after showing success message
+        setTimeout(() => {
+          router.push('/');
+          router.refresh(); // Refresh to update session
+        }, 1000);
+      } else if (result.error) {
+        setError(result.error.message || 'Invalid email or password');
+        setIsLoading(false);
+      } else {
+        // Fallback: redirect immediately if no error
+        setSuccess(true);
+        setTimeout(() => {
+          router.push('/');
+          router.refresh();
+        }, 1000);
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err?.message || 'Invalid email or password');
       setIsLoading(false);
     }
   };
