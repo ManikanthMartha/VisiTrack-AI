@@ -27,9 +27,6 @@ class GeminiScraper(BaseScraper):
     
     def _wait_for_response(self):
         """Wait for Gemini to finish generating response"""
-        
-        self.delay(3)  # Initial delay for response to start
-        
         logger.info("⏳ Waiting for Gemini to finish responding...")
         max_wait = 120  # 2 minutes max
         start_time = time.time()
@@ -69,10 +66,10 @@ class GeminiScraper(BaseScraper):
         self.random_delay(1, 2)
     
     def _extract_response(self) -> str:
-        """Extract the full response text from Gemini"""
+        """Extract the full response text from Gemini with embedded URLs"""
         logger.info("📊 Extracting response text...")
         
-        # Use JavaScript to get ALL text content from the response
+        # Use JavaScript to get text content WITH URLs embedded
         response_text = self.driver.execute_script("""
             // Get all model-response elements
             const responses = document.querySelectorAll('model-response');
@@ -87,8 +84,18 @@ class GeminiScraper(BaseScraper):
             // Find the markdown container inside it
             const markdown = lastResponse.querySelector('.markdown.markdown-main-panel');
             if (markdown) {
-                // Get full innerHTML and extract all text properly
+                // Clone the element to manipulate it
                 const clone = markdown.cloneNode(true);
+                
+                // Replace links with text that includes the URL
+                // Format: "link text (URL)"
+                clone.querySelectorAll('a').forEach(link => {
+                    const text = link.textContent || link.innerText || '';
+                    const href = link.getAttribute('href') || '';
+                    if (href) {
+                        link.replaceWith(document.createTextNode(`${text} (${href})`));
+                    }
+                });
                 
                 // Replace <br> with newlines
                 clone.querySelectorAll('br').forEach(br => br.replaceWith('\\n'));

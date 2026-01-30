@@ -9,14 +9,16 @@ import { FilterBar } from '@/components/ui-custom/FilterBar';
 import { VisibilityChart } from '@/components/charts/VisibilityChart';
 import { Leaderboard } from '@/components/ui-custom/Leaderboard';
 import { BrandCard } from '@/components/ui-custom/BrandCard';
-import { PromptHeatmap } from '@/components/ui-custom/PromptHeatmap';
-import { SourcesList } from '@/components/ui-custom/SourcesList';
 import { CompetitorToggle } from '@/components/ui-custom/CompetitorToggle';
 import { PlatformBreakdown } from '@/components/ui-custom/PlatformBreakdown';
+import { BrandCitations } from '@/components/ui-custom/BrandCitations';
+import { BrandSentiment } from '@/components/ui-custom/BrandSentiment';
+import { BrandKeywords } from '@/components/ui-custom/BrandKeywords';
+import { BrandContexts } from '@/components/ui-custom/BrandContexts';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
-import { apiClient, type BrandDetails, type LeaderboardBrand, type TimeSeriesData, type PlatformScore } from '@/lib/api';
+import { apiClient, type BrandDetails, type LeaderboardBrand, type TimeSeriesData, type PlatformScore, type Citation, type SentimentBreakdown, type Keyword, type BrandContext } from '@/lib/api';
 import type { FilterState } from '@/types';
 
 export default function CategoryPage() {
@@ -35,6 +37,11 @@ export default function CategoryPage() {
   const [brandDetails, setBrandDetails] = useState<BrandDetails | null>(null);
   const [timeseries, setTimeseries] = useState<TimeSeriesData[]>([]);
   const [platformScores, setPlatformScores] = useState<PlatformScore[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
+  const [sentiment, setSentiment] = useState<SentimentBreakdown | null>(null);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
+  const [contexts, setContexts] = useState<BrandContext[]>([]);
+  const [selectedKeyword, setSelectedKeyword] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,15 +78,23 @@ export default function CategoryPage() {
         setError(null);
         
         // Fetch all brand data in parallel
-        const [details, timeseriesData, platforms] = await Promise.all([
+        const [details, timeseriesData, platforms, cit, sent, key, ctx] = await Promise.all([
           apiClient.getBrandDetails(selectedBrandId),
           apiClient.getBrandTimeseries(selectedBrandId, 30),
-          apiClient.getBrandPlatformScores(selectedBrandId)
+          apiClient.getBrandPlatformScores(selectedBrandId),
+          apiClient.getBrandCitations(selectedBrandId, 10),
+          apiClient.getBrandSentiment(selectedBrandId),
+          apiClient.getBrandKeywords(selectedBrandId, 20),
+          apiClient.getBrandContexts(selectedBrandId, 20)
         ]);
 
         setBrandDetails(details);
         setTimeseries(timeseriesData);
         setPlatformScores(platforms);
+        setCitations(cit);
+        setSentiment(sent);
+        setKeywords(key);
+        setContexts(ctx);
       } catch (err) {
         console.error('Error fetching brand data:', err);
         setError('Failed to load brand details.');
@@ -110,13 +125,13 @@ export default function CategoryPage() {
   }
 
   // Transform data for components
-  const transformedLeaderboard = leaderboard.map(b => ({
+  const transformedLeaderboard = leaderboard.map((b, index) => ({
     id: b.id,
     name: b.name,
     logo: b.logo_url || b.name.charAt(0), // Use first letter if no logo
     visibilityScore: b.overall_visibility_score,
-    change: 0, // TODO: Calculate from historical data
-    rank: leaderboard.findIndex(lb => lb.id === b.id) + 1
+    changePercent: 0, // TODO: Calculate from historical data
+    rank: index + 1
   }));
 
   // Transform timeseries for chart (aggregate by date across platforms)
@@ -148,12 +163,16 @@ export default function CategoryPage() {
     gemini: 0
   } as { chatgpt: number; perplexity: number; claude: number; gemini: number });
 
-  // Generate dummy citations for now
-  const dummyCitations = [
-    { id: '1', url: 'https://example.com/review1', title: 'Top CRM Software Review', mentions: 15 },
-    { id: '2', url: 'https://example.com/comparison', title: 'CRM Comparison Guide', mentions: 12 },
-    { id: '3', url: 'https://example.com/blog', title: 'Best Tools for Startups', mentions: 8 }
-  ];
+  // Transform citations to Source format for BrandCard
+  const topSources = citations.slice(0, 3).map(c => ({
+    id: c.brand_id,
+    url: c.url,
+    title: c.title || c.domain || 'Untitled',
+    snippet: `Cited ${c.citation_count} times across ${c.response_count} responses`,
+    favicon: `https://www.google.com/s2/favicons?domain=${c.domain || c.url}`,
+    mentionCount: c.citation_count,
+    lastMentioned: new Date().toISOString() // TODO: Add last_mentioned to DB
+  }));
 
   // Create complete brand object for BrandCard
   const brandForCard = {
@@ -167,7 +186,7 @@ export default function CategoryPage() {
     promptCoverage: (brandDetails.total_mentions / Math.max(brandDetails.total_responses, 1)) * 100,
     changePercent: 0, // TODO: Calculate from historical data
     rank: transformedLeaderboard.findIndex(b => b.id === brandDetails.id) + 1,
-    topSources: dummyCitations,
+    topSources: topSources,
     timeSeriesData: chartData,
     promptBreakdown: [], // TODO: Add prompt breakdown
     rawResponses: [] // Not needed for display
@@ -237,6 +256,15 @@ export default function CategoryPage() {
                     title="Brand visibility"
                     subtitle={`Percentage of AI answers about ${brandDetails.category_name} that mention ${brandDetails.name}`}
                   />
+
+                  {/* LLM Extraction: Sentiment Analysis */}
+                  <BrandSentiment sentiment={sentiment} />
+
+                  {/* LLM Extraction: Brand Contexts */}
+                  <BrandContexts 
+                    contexts={contexts} 
+                    selectedKeyword={selectedKeyword}
+                  />
                 </div>
 
                 <div className="space-y-6">
@@ -250,9 +278,14 @@ export default function CategoryPage() {
                     <PlatformBreakdown scores={transformedPlatformScores} />
                   )}
 
-                  {dummyCitations.length > 0 && (
-                    <SourcesList sources={dummyCitations} />
-                  )}
+                  {/* LLM Extraction: Top Citations */}
+                  <BrandCitations citations={citations} />
+
+                  {/* LLM Extraction: Keywords */}
+                  <BrandKeywords 
+                    keywords={keywords}
+                    onKeywordClick={setSelectedKeyword}
+                  />
                 </div>
               </div>
             </motion.div>

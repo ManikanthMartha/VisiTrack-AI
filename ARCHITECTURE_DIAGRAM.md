@@ -4,46 +4,46 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         USER BROWSER                                 │
+│                         USER BROWSER                                │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    Next.js Frontend                            │  │
-│  │                   (TypeScript/React)                           │  │
-│  │                                                                 │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │  │
-│  │  │  Home Page   │  │ Category Page│  │  Components  │        │  │
-│  │  │  page.tsx    │  │  [id]/page   │  │  BrandCard   │        │  │
-│  │  └──────┬───────┘  └──────┬───────┘  │  Leaderboard │        │  │
-│  │         │                 │           │  Chart       │        │  │
-│  │         └────────┬────────┘           └──────────────┘        │  │
-│  │                  │                                             │  │
+│  │                    Next.js Frontend                           │  │
+│  │                   (TypeScript/React)                          │  │
+│  │                                                               │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐         │  │
+│  │  │  Home Page   │  │ Category Page│  │  Components  │         │  │
+│  │  │  page.tsx    │  │  [id]/page   │  │  BrandCard   │         │  │
+│  │  └──────┬───────┘  └──────┬───────┘  │  Leaderboard │         │  │
+│  │         │                 │          │  Chart       │         │  │
+│  │         └────────┬────────┘          └──────────────┘         │  │
+│  │                  │                                            │  │
 │  │         ┌────────▼────────┐                                   │  │
 │  │         │   API Client    │                                   │  │
 │  │         │   lib/api.ts    │                                   │  │
 │  │         │  (TypeScript)   │                                   │  │
 │  │         └────────┬────────┘                                   │  │
 │  └──────────────────┼────────────────────────────────────────────┘  │
-└────────────────────┼─────────────────────────────────────────────────┘
+└────────────────────┼────────────────────────────────────────────────┘
                      │
                      │ HTTP/JSON
                      │ fetch()
                      │
-┌────────────────────▼─────────────────────────────────────────────────┐
-│                    FastAPI Backend                                   │
-│                    (Python/Async)                                    │
-│                                                                       │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                      main.py                                 │   │
-│  │                   API Endpoints                              │   │
-│  │                                                              │   │
-│  │  GET /categories              → List categories             │   │
-│  │  GET /categories/{id}         → Category details            │   │
-│  │  GET /categories/{id}/leaderboard → Brand rankings          │   │
-│  │  GET /brands/{id}             → Brand details               │   │
-│  │  GET /brands/{id}/timeseries  → Time-series data            │   │
-│  │  GET /brands/{id}/platforms   → Platform scores             │   │
-│  │                                                              │   │
-│  └────────────────────┬─────────────────────────────────────────┘   │
-│                       │                                              │
+┌────────────────────▼────────────────────────────────────────────────┐
+│                    FastAPI Backend                                  │
+│                    (Python/Async)                                   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                      main.py                                │    │
+│  │                   API Endpoints                             │    │
+│  │                                                             │    │
+│  │  GET /categories              → List categories             │    │
+│  │  GET /categories/{id}         → Category details            │    │
+│  │  GET /categories/{id}/leaderboard → Brand rankings          │    │
+│  │  GET /brands/{id}             → Brand details               │    │
+│  │  GET /brands/{id}/timeseries  → Time-series data            │    │
+│  │  GET /brands/{id}/platforms   → Platform scores             │    │
+│  │                                                             │    │
+│  └────────────────────┬────────────────────────────────────────┘    │
+│                       │                                             │
 │  ┌────────────────────▼─────────────────────────────────────────┐   │
 │  │                   database.py                                │   │
 │  │                Database Functions                            │   │
@@ -55,7 +55,7 @@
 │  │  get_brand_platform_scores()                                 │   │
 │  │                                                              │   │
 │  └────────────────────┬─────────────────────────────────────────┘   │
-└────────────────────────┼──────────────────────────────────────────────┘
+└────────────────────────┼────────────────────────────────────────────┘
                          │
                          │ Supabase Client
                          │ (Python SDK)

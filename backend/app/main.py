@@ -409,6 +409,68 @@ async def get_brand_platform_scores(brand_id: str):
     return {"success": True, "data": scores}
 
 
+@app.get("/brands/{brand_id}/citations")
+async def get_brand_citations(brand_id: str, limit: int = 10):
+    """
+    Get top cited sources for a brand
+    
+    Returns URLs/sources that are most frequently cited when this brand is mentioned
+    """
+    logger.info(f"📚 Fetching citations for brand: {brand_id}")
+    citations = await db.get_brand_citations(brand_id, limit)
+    return {"success": True, "data": citations}
+
+
+@app.get("/brands/{brand_id}/contexts")
+async def get_brand_contexts(brand_id: str, limit: int = 20):
+    """
+    Get example contexts where brand is mentioned
+    
+    Returns 2-3 sentence summaries of how the brand is mentioned in AI responses
+    """
+    logger.info(f"💬 Fetching contexts for brand: {brand_id}")
+    contexts = await db.get_brand_contexts(brand_id, limit)
+    return {"success": True, "data": contexts}
+
+
+@app.get("/brands/{brand_id}/sentiment")
+async def get_brand_sentiment(brand_id: str):
+    """
+    Get sentiment breakdown for brand mentions
+    
+    Returns counts and percentages of positive/neutral/negative mentions
+    """
+    logger.info(f"😊 Fetching sentiment for brand: {brand_id}")
+    sentiment = await db.get_brand_sentiment(brand_id)
+    if not sentiment:
+        # Return empty sentiment if no data
+        return {
+            "success": True,
+            "data": {
+                "positive_count": 0,
+                "neutral_count": 0,
+                "negative_count": 0,
+                "total_mentions": 0,
+                "positive_percentage": 0,
+                "neutral_percentage": 0,
+                "negative_percentage": 0
+            }
+        }
+    return {"success": True, "data": sentiment}
+
+
+@app.get("/brands/{brand_id}/keywords")
+async def get_brand_keywords(brand_id: str, limit: int = 20):
+    """
+    Get top keywords associated with brand
+    
+    Returns most common themes/topics mentioned with this brand
+    """
+    logger.info(f"🏷️ Fetching keywords for brand: {brand_id}")
+    keywords = await db.get_brand_keywords(brand_id, limit)
+    return {"success": True, "data": keywords}
+
+
 @app.post("/scrape/prompt", response_model=QueryResponse)
 async def scrape_prompt(request: PromptScrapeRequest):
     """

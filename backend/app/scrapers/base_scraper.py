@@ -143,43 +143,46 @@ class BaseScraper(ABC):
             options = self._get_chrome_options()
             
             logger.info("🌐 Launching Chrome browser...")
-            # Get Chrome version and use it explicitly to avoid version mismatches
+            # Launch browser with proper headless handling
             try:
-                import re
-                import subprocess
-                result = subprocess.run(
-                    ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0:
-                    match = re.search(r'version\s+REG_SZ\s+(\d+)', result.stdout)
-                    if match:
-                        chrome_version = int(match.group(1))
-                        logger.info(f"🔍 Detected Chrome version: {chrome_version}")
-                        # Headless mode needs additional settings
-                        if settings.HEADLESS:
-                            self.driver = uc.Chrome(
-                                options=options, 
-                                version_main=chrome_version,
-                                headless=True,
-                                use_subprocess=True
-                            )
-                        else:
-                            self.driver = uc.Chrome(options=options, version_main=chrome_version)
-                    else:
-                        self.driver = uc.Chrome(options=options, headless=settings.HEADLESS)
-                else:
-                    self.driver = uc.Chrome(options=options, headless=settings.HEADLESS)
-            except Exception as version_error:
-                logger.warning(f"⚠️ Could not detect Chrome version: {version_error}, using auto-detect")
+                # Detect Chrome version to avoid mismatches
+                chrome_version = None
                 try:
-                    self.driver = uc.Chrome(options=options, headless=settings.HEADLESS)
-                except Exception as uc_error:
-                    logger.error(f"❌ Failed to launch with undetected-chromedriver: {uc_error}")
-                    logger.info("⚙️ Trying standard ChromeDriver as fallback...")
-                    from selenium import webdriver
-                    service = webdriver.ChromeService()
-                    self.driver = webdriver.Chrome(service=service, options=options)
+                    import re
+                    import subprocess
+                    result = subprocess.run(
+                        ['reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode == 0:
+                        match = re.search(r'version\s+REG_SZ\s+(\d+)', result.stdout)
+                        if match:
+                            chrome_version = int(match.group(1))
+                            logger.info(f"🔍 Detected Chrome version: {chrome_version}")
+                except Exception as e:
+                    logger.debug(f"Could not detect Chrome version: {e}")
+                
+                # Launch with version if detected
+                if settings.HEADLESS:
+                    logger.info("🕶️ Launching in headless mode...")
+                    if chrome_version:
+                        self.driver = uc.Chrome(options=options, version_main=chrome_version, use_subprocess=False)
+                    else:
+                        self.driver = uc.Chrome(options=options, use_subprocess=False)
+                else:
+                    logger.info("👁️ Launching in visible mode...")
+                    if chrome_version:
+                        self.driver = uc.Chrome(options=options, version_main=chrome_version)
+                    else:
+                        self.driver = uc.Chrome(options=options)
+                        
+            except Exception as uc_error:
+                logger.error(f"❌ Failed to launch with undetected-chromedriver: {uc_error}")
+                logger.info("⚙️ Trying standard ChromeDriver as fallback...")
+                from selenium import webdriver
+                service = webdriver.ChromeService()
+                self.driver = webdriver.Chrome(service=service, options=options)
+            
             logger.success("✅ Browser launched successfully!")
             
             # Start screenshot capture for debugging (headless only)
@@ -236,29 +239,21 @@ class BaseScraper(ABC):
         """Get configured Chrome options"""
         options = uc.ChromeOptions()
         
-        # Headless mode
-        if settings.HEADLESS:
-            # Use old headless mode for better compatibility
-            options.add_argument('--headless')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-software-rasterizer')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--no-sandbox')
-            # Larger window for headless to ensure content loads
-            options.add_argument('--window-size=1920,1080')
-            logger.info("🕶️  Running in headless mode")
-        else:
-            logger.info("👁️  Running in visible mode")
-            options.add_argument('--start-maximized')
-        
-        # Anti-detection options
+        # Anti-detection options (always applied)
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--no-sandbox')
         
-        if not settings.HEADLESS:
-            # Window size for visible mode
+        # Headless mode
+        if settings.HEADLESS:
+            # Use new headless mode (more stable)
+            options.add_argument('--headless=new')
+            options.add_argument('--disable-gpu')
             options.add_argument('--window-size=1920,1080')
+            logger.info("🕶️  Configuring headless mode")
+        else:
+            options.add_argument('--start-maximized')
+            logger.info("👁️  Configuring visible mode")
         
         # User agent
         options.add_argument(
@@ -510,9 +505,13 @@ class BaseScraper(ABC):
             )
             logger.info("🖱️  Clicking send button...")
             send_button.click()
+            logger.info("⏳ Waiting 10-15 seconds for response to generate...")
+            self.random_delay(10, 15)  # Wait for response to start generating
         except TimeoutException:
             logger.warning("⚠️ Send button not found, trying Enter key...")
             input_field.send_keys(Keys.RETURN)
+            logger.info("⏳ Waiting 10-15 seconds for response to generate...")
+            self.random_delay(10, 15)  # Wait for response to start generating
     
     @abstractmethod
     def _wait_for_response(self):

@@ -370,6 +370,169 @@ class Database:
             logger.error(f"❌ Session load error for {ai_source}: {e}")
             return None
     
+    # ============= LLM Extraction Operations =============
+    
+    async def save_citations(
+        self, 
+        response_id: str, 
+        brand_name: str,
+        citations: List[Dict]
+    ) -> bool:
+        """
+        Save citations for a brand in a response
+        
+        Args:
+            response_id: UUID of response
+            brand_name: Name of brand
+            citations: List of citation dicts from LLM
+        """
+        try:
+            for citation in citations:
+                self.client.table('citations').insert({
+                    'response_id': response_id,
+                    'brand_name': brand_name,
+                    'url': citation['url'],
+                    'title': citation.get('title'),
+                    'domain': citation.get('domain', ''),
+                    'position': citation.get('position', 0)
+                }).execute()
+            
+            logger.info(f"✅ Saved {len(citations)} citations for {brand_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving citations: {e}")
+            return False
+    
+    async def save_brand_mention(
+        self,
+        response_id: str,
+        brand_name: str,
+        mention_data: Dict
+    ) -> bool:
+        """
+        Save brand mention context from LLM
+        
+        Args:
+            response_id: UUID of response
+            brand_name: Name of brand
+            mention_data: Dict with context, sentiment, keywords from LLM
+        """
+        try:
+            self.client.table('brand_mentions').insert({
+                'response_id': response_id,
+                'brand_name': brand_name,
+                'context': mention_data.get('context', ''),
+                'full_context': mention_data.get('context', ''),  # Use context for both fields
+                'position': 0,  # Can be calculated if needed
+                'sentiment': mention_data.get('sentiment', 'neutral'),
+                'keywords': mention_data.get('keywords', [])
+            }).execute()
+            
+            logger.info(f"✅ Saved mention context for {brand_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving brand mention: {e}")
+            return False
+    
+    async def get_brand_citations(
+        self, 
+        brand_id: str, 
+        limit: int = 10
+    ) -> List[Dict]:
+        """Get top citations for a brand"""
+        try:
+            # Get brand name first
+            brand = await self.get_brand_details(brand_id)
+            if not brand:
+                return []
+            
+            result = self.client.table('brand_top_citations')\
+                .select('*')\
+                .eq('brand_id', brand_id)\
+                .order('citation_count', desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand citations: {e}")
+            return []
+    
+    async def get_brand_contexts(
+        self,
+        brand_id: str,
+        limit: int = 20
+    ) -> List[Dict]:
+        """Get example contexts where brand is mentioned"""
+        try:
+            # Get brand name first
+            brand = await self.get_brand_details(brand_id)
+            if not brand:
+                return []
+            
+            result = self.client.table('brand_mentions')\
+                .select('*')\
+                .eq('brand_name', brand['name'])\
+                .order('created_at', desc=True)\
+                .limit(limit)\
+                .execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand contexts: {e}")
+            return []
+    
+    async def get_brand_sentiment(self, brand_id: str) -> Optional[Dict]:
+        """Get sentiment breakdown for a brand"""
+        try:
+            result = self.client.table('brand_sentiment_breakdown')\
+                .select('*')\
+                .eq('brand_id', brand_id)\
+                .single()\
+                .execute()
+            
+            return result.data if result.data else None
+            
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand sentiment: {e}")
+            return None
+    
+    async def get_brand_keywords(self, brand_id: str, limit: int = 20) -> List[Dict]:
+        """Get top keywords associated with brand"""
+        try:
+            # Get brand name first
+            brand = await self.get_brand_details(brand_id)
+            if not brand:
+                return []
+            
+            # Get all keywords
+            result = self.client.table('brand_mentions')\
+                .select('keywords')\
+                .eq('brand_name', brand['name'])\
+                .execute()
+            
+            # Flatten and count
+            from collections import Counter
+            all_keywords = []
+            for mention in result.data if result.data else []:
+                if mention.get('keywords'):
+                    all_keywords.extend(mention['keywords'])
+            
+            keyword_counts = Counter(all_keywords)
+            
+            return [
+                {"keyword": k, "count": v}
+                for k, v in keyword_counts.most_common(limit)
+            ]
+            
+        except Exception as e:
+            logger.error(f"❌ Error fetching brand keywords: {e}")
+            return []
+    
     # ============= Analytics Operations =============
     
     async def get_visibility_scores(

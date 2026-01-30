@@ -28,6 +28,9 @@ fake-useragent
 pyautogui  # Human-like mouse movements
 numpy      # For Bezier curves
 
+# LLM for Extraction
+google-genai
+
 # Background Jobs (Optional)
 celery
 redis

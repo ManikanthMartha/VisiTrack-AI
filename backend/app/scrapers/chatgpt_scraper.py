@@ -27,8 +27,6 @@ class ChatGPTScraper(BaseScraper):
     
     def _wait_for_response(self):
         """Wait for ChatGPT to finish generating response"""
-        self.delay(3)  # Initial delay for response to start
-        
         logger.info("⏳ Waiting for ChatGPT to finish responding...")
         max_wait = 120  # 2 minutes max
         start_time = time.time()
@@ -52,10 +50,10 @@ class ChatGPTScraper(BaseScraper):
         self.random_delay(1, 2)
     
     def _extract_response(self) -> str:
-        """Extract the full response text from ChatGPT"""
+        """Extract the full response text from ChatGPT with embedded URLs"""
         logger.info("📊 Extracting response text...")
         
-        # Use JavaScript to get ALL text content from the response
+        # Use JavaScript to get text content WITH URLs embedded
         response_text = self.driver.execute_script("""
             // Get all assistant messages
             const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
@@ -70,9 +68,18 @@ class ChatGPTScraper(BaseScraper):
             // Try to get the markdown content div
             const markdownDiv = lastMessage.querySelector('.markdown');
             if (markdownDiv) {
-                // Get full innerHTML to capture all content including nested elements
-                // Then extract text, preserving structure
+                // Clone the element to manipulate it
                 const clone = markdownDiv.cloneNode(true);
+                
+                // Replace links with text that includes the URL
+                // Format: "link text (URL)"
+                clone.querySelectorAll('a').forEach(link => {
+                    const text = link.textContent || link.innerText || '';
+                    const href = link.getAttribute('href') || '';
+                    if (href) {
+                        link.replaceWith(document.createTextNode(`${text} (${href})`));
+                    }
+                });
                 
                 // Replace <br> with newlines
                 clone.querySelectorAll('br').forEach(br => br.replaceWith('\\n'));

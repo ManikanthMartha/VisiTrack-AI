@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     
     # LLM Settings
     LLM_ENABLED: bool = True  # Toggle LLM extraction
-    LLM_MODEL: str = "gemini-1.5-flash"  # Fast & free model
+    LLM_MODEL: str = "gemini-2.5-flash"  # Fast & free model
     
     class Config:
         env_file = ".env"

@@ -66,6 +66,49 @@ export interface LeaderboardBrand {
   total_mentions: number; // COUNT (bigint)
 }
 
+// ============= LLM Extraction Types =============
+
+export interface Citation {
+  brand_id: string;     // UUID as string
+  brand_name: string;
+  url: string;
+  title: string | null;
+  domain: string | null;
+  citation_count: number; // COUNT (bigint)
+  avg_position: number; // AVG (numeric)
+  response_count: number; // COUNT (bigint)
+}
+
+export interface BrandContext {
+  id: string;           // UUID as string
+  response_id: string;  // UUID as string
+  brand_name: string;
+  context: string;      // 2-3 sentence summary
+  full_context: string | null; // Full paragraph
+  sentiment: 'positive' | 'neutral' | 'negative';
+  keywords: string[];   // TEXT[] from DB
+  created_at: string;   // TIMESTAMP as ISO string
+  position: number;
+}
+
+export interface SentimentBreakdown {
+  brand_id: string;     // UUID as string
+  brand_name: string;
+  category_id: string;  // VARCHAR(100)
+  positive_count: number; // COUNT (bigint)
+  neutral_count: number;  // COUNT (bigint)
+  negative_count: number; // COUNT (bigint)
+  total_mentions: number; // COUNT (bigint)
+  positive_percentage: number; // DECIMAL(5,2)
+  neutral_percentage: number;  // DECIMAL(5,2)
+  negative_percentage: number; // DECIMAL(5,2)
+}
+
+export interface Keyword {
+  keyword: string;
+  count: number;
+}
+
 // ============= API Response Wrapper =============
 
 interface ApiResponse<T> {
@@ -139,6 +182,23 @@ class ApiClient {
 
   async getBrandPlatformScores(brandId: string): Promise<PlatformScore[]> {
     return this.fetch<PlatformScore[]>(`/brands/${brandId}/platforms`);
+  }
+
+  // LLM Extraction endpoints
+  async getBrandCitations(brandId: string, limit: number = 10): Promise<Citation[]> {
+    return this.fetch<Citation[]>(`/brands/${brandId}/citations?limit=${limit}`);
+  }
+
+  async getBrandContexts(brandId: string, limit: number = 20): Promise<BrandContext[]> {
+    return this.fetch<BrandContext[]>(`/brands/${brandId}/contexts?limit=${limit}`);
+  }
+
+  async getBrandSentiment(brandId: string): Promise<SentimentBreakdown> {
+    return this.fetch<SentimentBreakdown>(`/brands/${brandId}/sentiment`);
+  }
+
+  async getBrandKeywords(brandId: string, limit: number = 20): Promise<Keyword[]> {
+    return this.fetch<Keyword[]>(`/brands/${brandId}/keywords?limit=${limit}`);
   }
 }
 

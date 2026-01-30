@@ -130,7 +130,8 @@ class PerplexityScraper(BaseScraper):
                 self.driver.execute_script("arguments[0].click();", send_button)
                 logger.success("✅ JavaScript click succeeded")
             
-            self.delay(1)
+            logger.info("⏳ Waiting 10-15 seconds for response to generate...")
+            self.random_delay(10, 15)  # Wait for response to start generating
             
         except Exception as e:
             logger.error(f"❌ Could not click send button: {e}")
@@ -145,6 +146,8 @@ class PerplexityScraper(BaseScraper):
                         logger.info(f"Found button with aria-label: {aria_label}")
                         btn.click()
                         logger.success("✅ Clicked alternative send button")
+                        logger.info("⏳ Waiting 10-15 seconds for response to generate...")
+                        self.random_delay(10, 15)  # Wait for response to start generating
                         return
             except Exception as e2:
                 logger.error(f"Alternative button search failed: {e2}")
@@ -156,8 +159,6 @@ class PerplexityScraper(BaseScraper):
         if not self.driver:
             raise RuntimeError("Driver not initialized")
             
-        self.delay(3)  # Initial delay for response to start
-        
         logger.info("⏳ Waiting for Perplexity to finish responding...")
         max_wait = 120  # 2 minutes max
         start_time = time.time()
@@ -202,13 +203,13 @@ class PerplexityScraper(BaseScraper):
         self.random_delay(1, 2)
     
     def _extract_response(self) -> str:
-        """Extract the full response text from Perplexity"""
+        """Extract the full response text from Perplexity with embedded URLs"""
         if not self.driver:
             raise RuntimeError("Driver not initialized")
             
         logger.info("📊 Extracting response text...")
         
-        # Use JavaScript to get ALL text content from the response
+        # Use JavaScript to get text content WITH URLs embedded
         response_text = self.driver.execute_script("""
             // Get all markdown content containers
             const containers = document.querySelectorAll('div[id^="markdown-content-"]');
@@ -223,8 +224,18 @@ class PerplexityScraper(BaseScraper):
             // Find the prose content inside it
             const prose = lastContainer.querySelector('.prose');
             if (prose) {
-                // Get full innerHTML and extract all text properly
+                // Clone the element to manipulate it
                 const clone = prose.cloneNode(true);
+                
+                // Replace links with text that includes the URL
+                // Format: "link text (URL)"
+                clone.querySelectorAll('a').forEach(link => {
+                    const text = link.textContent || link.innerText || '';
+                    const href = link.getAttribute('href') || '';
+                    if (href) {
+                        link.replaceWith(document.createTextNode(`${text} (${href})`));
+                    }
+                });
                 
                 // Replace <br> with newlines
                 clone.querySelectorAll('br').forEach(br => br.replaceWith('\\n'));

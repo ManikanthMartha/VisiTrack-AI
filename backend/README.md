@@ -1,291 +1,405 @@
-# AI Visibility Tracker - Python Backend
+# Backend Setup Guide
 
-Python scraping service using FastAPI and undetected-chromedriver for anti-detection browser automation.
+Python FastAPI backend for AI Visibility Tracker with browser automation and LLM extraction.
 
-## ✅ Setup Complete
+## Prerequisites
 
-All core files have been implemented:
-- ✅ Configuration management (`app/config.py`)
-- ✅ Supabase database client (`app/database.py`)
-- ✅ **Oxylabs proxy integration** (`app/utils/proxy_manager.py`) 🔒
-- ✅ **Local response storage** (`app/utils/response_storage.py`) 💾
-- ✅ Base scraper with anti-detection (`app/scrapers/base_scraper.py`)
-- ✅ ChatGPT scraper (`app/scrapers/chatgpt_scraper.py`)
-- ✅ FastAPI application (`app/main.py`)
-- ✅ Pydantic models (`app/models/schemas.py`)
+- Python 3.9 or higher
+- Google Chrome browser
+- PostgreSQL database (Supabase account)
+- Google AI Studio API key
 
-## 🔒 Oxylabs Proxy Integration
+## Installation
 
-**IMPORTANT:** The scraper is configured to use Oxylabs datacenter proxies. All traffic goes through proxies - your IP is never exposed.
-
-**Quick Setup:**
-1. Add Oxylabs credentials to `.env`
-2. Run `.\test_proxy.ps1` to verify
-3. Start scraping safely!
-
-See **[OXYLABS_SETUP.md](OXYLABS_SETUP.md)** for complete guide.
-
-## 🚀 Quick Start
-
-### 1. Setup Supabase Database
-
-Run the SQL schema in your Supabase SQL Editor:
+### 1. Create Virtual Environment
 
 ```bash
-# Open supabase_schema.sql and copy/paste into Supabase SQL Editor
+cd backend
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
 ```
 
-This creates:
-- `responses` table - stores AI responses and brand mentions
-- `scraper_sessions` table - stores authentication cookies
-- `brand_mentions` table - aggregated brand statistics
+### 2. Install Dependencies
 
-### 2. Configure Environment
+```bash
+pip install -r requirements.txt
+```
 
-Your `.env` file should have:
-```properties
+**Key packages**:
+- `fastapi` - Web framework
+- `uvicorn` - ASGI server
+- `selenium` - Browser automation
+- `undetected-chromedriver` - Anti-detection
+- `google-genai` - LLM extraction
+- `supabase` - Database client
+- `loguru` - Logging
+
+### 3. Environment Configuration
+
+Create `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+# Database (Required)
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-key
-HEADLESS=false  # Set to false for first run (manual login)
+SUPABASE_KEY=your-supabase-anon-key
+
+# LLM Extraction (Required)
+GOOGLE_API_KEY=your-google-ai-studio-key
+LLM_MODEL=gemini-2.5-flash
+
+# Proxy (Optional - for production)
+USE_PROXY=false
+OXYLABS_USERNAME=your-username
+OXYLABS_PASSWORD=your-password
+
+# Scraper Settings
+HEADLESS=true
+RATE_LIMIT_DELAY=30
+RANDOM_DELAY_MIN=1
+RANDOM_DELAY_MAX=3
+USE_STEALTH=true
+
+# Server
+HOST=0.0.0.0
+PORT=8000
+ENVIRONMENT=development
 ```
 
-### 3. Run the Server
+### 4. Database Setup
 
-```powershell
-# Activate virtual environment (if not already active)
-.\venv\Scripts\activate
+**Create Supabase Project**:
+1. Go to https://supabase.com
+2. Create new project
+3. Copy URL and anon key to `.env`
 
-# Run the server
-python -m app.main
+**Run SQL Migrations**:
 
-# Or with uvicorn directly
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+Open Supabase SQL Editor and run:
+
+1. **Main Schema** (`supabase_schema.sql`):
+   - Creates categories, brands, prompts, responses tables
+   - Sets up relationships and constraints
+
+2. **LLM Schema** (`llm_extraction_schema.sql`):
+   - Creates citations and brand_mentions tables
+   - Creates analytics views
+
+3. **Seed Data** (`seed_data.sql`):
+   - Adds sample categories (CRM, Project Management)
+   - Adds sample brands (Salesforce, HubSpot, etc.)
+   - Adds sample prompts
+
+### 5. Get Google AI Studio API Key
+
+1. Go to https://aistudio.google.com/app/apikey
+2. Sign in with Google account
+3. Click "Create API Key"
+4. Copy key to `.env` as `GOOGLE_API_KEY`
+
+**Free Tier Limits**:
+- 15 requests per minute
+- 1,500 requests per day
+- Sufficient for testing and small-scale usage
+
+### 6. Setup Browser Sessions (One-time)
+
+**ChatGPT**:
+```bash
+python setup_chatgpt_login.py
+```
+- Browser opens to ChatGPT
+- Log in manually
+- Wait 90 seconds
+- Cookies saved automatically
+
+**Gemini**:
+```bash
+python setup_gemini_login.py
 ```
 
-You should see:
-```
-🚀 Starting AI Visibility Tracker Scraping Service
-📍 Environment: development
-👁️  Headless mode: False
+**Perplexity**:
+```bash
+python setup_perplexity_login.py
 ```
 
-### 4. First Run - Manual Login
+Cookies are saved in `storage/` and reused for future scrapes.
 
-When you first run a scrape request:
-1. A Chrome browser window will open
-2. Navigate to ChatGPT and log in manually
-3. The script waits 90 seconds
-4. After login, cookies are saved automatically
-5. Future runs won't need manual login!
+## Running the Application
 
-## 📡 API Endpoints
-
-### Health Check
-```http
-GET http://localhost:8000/health
-```
-
-Response:
-```json
-{
-  "status": "healthy",
-  "scrapers": ["chatgpt"],
-  "environment": "development"
-}
-```
-
-### Scrape ChatGPT
-```http
-POST http://localhost:8000/scrape
-Content-Type: application/json
-
-{
-  "prompt": "What's the best CRM software for startups?",
-  "brands": ["Salesforce", "HubSpot", "Pipedrive", "Zoho", "Monday.com"],
-  "ai_source": "chatgpt"
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid-here",
-    "prompt": "What's the best CRM software for startups?",
-    "ai_source": "chatgpt",
-    "response": "Here are some excellent CRM options for startups...",
-    "brands_mentioned": ["HubSpot", "Pipedrive"]
-  }
-}
-```
-
-### Get Response by ID
-```http
-GET http://localhost:8000/responses/{response-id}
-```
-
-### Reset Scraper
-If the scraper gets stuck or you need to re-login:
-```http
-DELETE http://localhost:8000/scrapers/chatgpt
-```
-
-## 🧪 Testing
-
-### Using PowerShell (Invoke-RestMethod)
-
-```powershell
-# Health check
-Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get
-
-# Scrape request
-$body = @{
-    prompt = "What are the best project management tools?"
-    brands = @("Asana", "Monday.com", "Trello", "ClickUp", "Notion")
-    ai_source = "chatgpt"
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:8000/scrape" -Method Post -Body $body -ContentType "application/json"
-```
-
-### Using cURL
+### Start API Server
 
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# Scrape request
-curl -X POST http://localhost:8000/scrape \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "What are the best email marketing tools?",
-    "brands": ["Mailchimp", "SendGrid", "ConvertKit"],
-    "ai_source": "chatgpt"
-  }'
+python -m app.main
 ```
 
-## 🎯 How It Works
+Server runs on http://localhost:8000
 
-1. **Request comes in** → Creates database record with status 'processing'
-2. **Scraper initialization** → 
-   - Launches undetected Chrome browser
-   - Loads saved cookies (if available)
-   - Checks login status
-   - Waits for manual login if needed (first run only)
-3. **Query execution** →
-   - Enforces rate limiting (3 min between requests by default)
-   - Types prompt with human-like delays
-   - Waits for response to complete
-   - Extracts text using JavaScript
-4. **Brand detection** → Scans response for brand mentions (case-insensitive)
-5. **Database update** → Saves response and brand mentions
-6. **Return results** → Returns to API caller
+**API Documentation**: http://localhost:8000/docs
 
-## 🔒 Anti-Detection Features
+### Start Worker (Scraper)
 
-- ✅ **undetected-chromedriver** - Bypasses Cloudflare and bot detection
-- ✅ **Cookie persistence** - Maintains login sessions
-- ✅ **Human-like typing** - Random delays between keystrokes (50-150ms)
-- ✅ **Random delays** - Random waits between actions (1-3s)
-- ✅ **Rate limiting** - 3 minutes between requests (configurable)
-- ✅ **Realistic user agent** - Mimics real browser
-- ✅ **Session reuse** - Keeps browser open between requests
+```bash
+python worker.py --ai-source chatgpt --max-iterations 5
+```
 
-## 📁 Project Structure
+**Options**:
+- `--ai-source`: `chatgpt`, `gemini`, or `perplexity`
+- `--max-iterations`: Number of prompts to process (default: infinite)
+- `--category`: Filter by category ID (optional)
+
+**Example**:
+```bash
+# Process 10 ChatGPT prompts
+python worker.py --ai-source chatgpt --max-iterations 10
+
+# Process all Gemini prompts in CRM category
+python worker.py --ai-source gemini --category crm_software
+
+# Run continuously
+python worker.py --ai-source perplexity
+```
+
+## Project Structure
 
 ```
 backend/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI application
-│   ├── config.py            # Settings from .env
-│   ├── database.py          # Supabase client
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── schemas.py       # Pydantic models
 │   ├── scrapers/
-│   │   ├── __init__.py
-│   │   ├── base_scraper.py  # Base class
-│   │   └── chatgpt_scraper.py
-│   └── utils/
-│       ├── __init__.py
-│       └── brand_detector.py
-├── storage/                 # Cookie storage
-├── logs/                    # Application logs
-├── .env                     # Environment variables
-├── requirements.txt
-└── supabase_schema.sql      # Database schema
+│   │   ├── base_scraper.py       # Base class with anti-detection
+│   │   ├── chatgpt_scraper.py    # ChatGPT implementation
+│   │   ├── gemini_scraper.py     # Gemini implementation
+│   │   └── perplexity_scraper.py # Perplexity implementation
+│   ├── utils/
+│   │   ├── llm_extractor.py      # Gemini API extraction
+│   │   ├── proxy_manager.py      # Proxy configuration
+│   │   └── response_storage.py   # File storage
+│   ├── models/
+│   │   └── schemas.py            # Pydantic models
+│   ├── config.py                 # Settings management
+│   ├── database.py               # Database operations
+│   └── main.py                   # FastAPI application
+├── storage/
+│   ├── chatgpt_cookies.json      # Saved sessions
+│   ├── responses/                # Raw responses
+│   └── debug/                    # Screenshots (headless)
+├── logs/
+│   └── app.log                   # Application logs
+├── worker.py                     # Background scraper
+├── requirements.txt              # Python dependencies
+└── .env                          # Configuration
 ```
 
-## ⚙️ Configuration
+## API Endpoints
 
-Edit `.env` to customize:
+### Categories
+```
+GET  /categories                    # List all categories
+GET  /categories/{id}               # Get category details
+GET  /categories/{id}/leaderboard   # Brand rankings
+GET  /categories/{id}/brands        # All brands in category
+GET  /categories/{id}/prompts       # All prompts in category
+```
 
-```properties
-# Change to true after first successful login
+### Brands
+```
+GET  /brands/{id}                   # Brand details
+GET  /brands/{id}/timeseries        # Historical visibility
+GET  /brands/{id}/platforms         # Per-platform scores
+GET  /brands/{id}/citations         # Top cited sources
+GET  /brands/{id}/contexts          # Example mentions
+GET  /brands/{id}/sentiment         # Sentiment breakdown
+GET  /brands/{id}/keywords          # Associated keywords
+```
+
+### Scraping
+```
+POST /scrape                        # Legacy scrape endpoint
+POST /scrape/prompt                 # Scrape specific prompt
+GET  /responses/{id}                # Get response by ID
+```
+
+### System
+```
+GET  /                              # Service info
+GET  /health                        # Health check
+```
+
+## Testing
+
+### Test LLM Extraction
+```bash
+python test_llm_extraction.py
+```
+
+Extracts data from a sample response and optionally saves to database.
+
+### Test API
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Get categories
+curl http://localhost:8000/categories
+
+# Get brand details
+curl http://localhost:8000/brands/{brand-id}
+```
+
+### Test Scraper
+```bash
+# Test ChatGPT scraper
+python -c "
+from app.scrapers.chatgpt_scraper import ChatGPTScraper
+import asyncio
+
+async def test():
+    scraper = ChatGPTScraper()
+    await scraper.initialize()
+    result = await scraper.query('What is the best CRM?', ['Salesforce', 'HubSpot'])
+    print(result.text)
+    await scraper.cleanup()
+
+asyncio.run(test())
+"
+```
+
+## Troubleshooting
+
+### Browser Issues
+
+**Problem**: Browser closes immediately
+```bash
+# Solution: Disable headless mode
+# In .env:
 HEADLESS=false
-
-# Adjust delays (in seconds)
-RANDOM_DELAY_MIN=1
-RANDOM_DELAY_MAX=3
-RATE_LIMIT_DELAY=180  # 3 minutes
-
-# Add proxy if needed
-# PROXY_URL=http://username:password@proxy.com:8080
 ```
 
-## 🐛 Troubleshooting
+**Problem**: ChromeDriver version mismatch
+```bash
+# Solution: Update Chrome or let undetected-chromedriver auto-download
+pip install --upgrade undetected-chromedriver
+```
 
-### "Scraper not initialized" error
-- Restart the server
-- Delete cached scraper: `DELETE /scrapers/chatgpt`
+### LLM Extraction Issues
 
-### "Could not extract response text"
-- Check if ChatGPT UI changed
-- Look at browser window (if not headless)
-- Check logs in `logs/app.log`
+**Problem**: JSON parsing errors
+```bash
+# Check API key is valid
+python -c "
+from google import genai
+client = genai.Client(api_key='your-key')
+print('API key valid!')
+"
+```
 
-### Chrome/ChromeDriver version mismatch
-The scraper auto-detects Chrome version. If issues occur:
+**Problem**: Rate limit exceeded
+```bash
+# Free tier: 15 req/min, 1,500 req/day
+# Solution: Add delays or upgrade to paid tier
+```
+
+### Database Issues
+
+**Problem**: Connection refused
+```bash
+# Check Supabase URL and key in .env
+# Verify network connectivity
+curl https://your-project.supabase.co
+```
+
+**Problem**: Missing tables
+```bash
+# Run SQL migrations in Supabase dashboard
+# Check supabase_schema.sql and llm_extraction_schema.sql
+```
+
+### Proxy Issues
+
+**Problem**: Proxy connection failed
+```bash
+# Solution: Disable proxy for testing
+# In .env:
+USE_PROXY=false
+```
+
+**Problem**: Authentication failed
+```bash
+# Verify Oxylabs credentials
+# Test proxy manually:
+curl -x http://username:password@proxy.oxylabs.io:7777 https://ip.oxylabs.io
+```
+
+## Configuration Options
+
+### Scraper Settings
+
 ```python
-# In chatgpt_scraper.py, line with uc.Chrome()
-self.driver = uc.Chrome(options=options, version_main=120)  # Specify version
+# config.py
+HEADLESS = True              # Run browser in background
+RATE_LIMIT_DELAY = 30        # Seconds between requests
+RANDOM_DELAY_MIN = 1         # Min random delay
+RANDOM_DELAY_MAX = 3         # Max random delay
+USE_STEALTH = True           # Enable anti-detection
 ```
 
-### Still getting detected
-1. Use residential proxy (set PROXY_URL in .env)
-2. Increase delays in .env
-3. Run in non-headless mode
-4. Check if cookies are loading correctly
+### LLM Settings
 
-## 📊 Viewing Logs
-
-```powershell
-# Real-time logs
-Get-Content -Path ".\logs\app.log" -Wait -Tail 50
-
-# Or just open the file
-notepad .\logs\app.log
+```python
+LLM_MODEL = "gemini-2.0-flash-exp"  # Gemini model
+MAX_OUTPUT_TOKENS = 2048             # Per batch
+BATCH_SIZE = 3                       # Brands per batch
 ```
 
-## 🔜 Next Steps
+### Proxy Settings
 
-- [ ] Add Gemini scraper (similar to ChatGPT)
-- [ ] Add Perplexity scraper
-- [ ] Implement background jobs with Celery
-- [ ] Add retry logic for failed requests
-- [ ] Add more brand detection patterns
-- [ ] Implement proxy rotation
-- [ ] Add captcha solving
-- [ ] Build monitoring dashboard
+```python
+USE_PROXY = False                    # Enable/disable
+OXYLABS_USERNAME = "username"        # Proxy username
+OXYLABS_PASSWORD = "password"        # Proxy password
+PROXY_HOST = "proxy.oxylabs.io"      # Proxy host
+PROXY_PORT = 7777                    # Proxy port
+```
 
-## 📚 API Documentation
+## Logging
 
-Interactive API docs available at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+Logs are written to:
+- **Console**: Colored output with timestamps
+- **File**: `logs/app.log` (rotated at 500MB)
 
-## 🎉 Success!
+**Log Levels**:
+- `DEBUG`: Detailed information
+- `INFO`: General information
+- `SUCCESS`: Successful operations
+- `WARNING`: Warning messages
+- `ERROR`: Error messages
 
-Your Python backend is ready! Start the server and make your first scrape request.
+**View Logs**:
+```bash
+# Tail logs
+tail -f logs/app.log
+
+# Search logs
+grep "ERROR" logs/app.log
+
+# Filter by component
+grep "llm_extractor" logs/app.log
+```
+
+## Performance Tips
+
+1. **Parallel Workers**: Run multiple workers for different platforms
+2. **Headless Mode**: Enable for better performance
+3. **Proxy Rotation**: Use proxies to avoid rate limits
+4. **Batch Processing**: LLM processes 3 brands at a time
+5. **Connection Pooling**: Reuse database connections

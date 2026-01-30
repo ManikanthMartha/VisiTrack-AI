@@ -13,6 +13,7 @@ from app.scrapers.chatgpt_scraper import ChatGPTScraper
 from app.scrapers.gemini_scraper import GeminiScraper
 from app.scrapers.perplexity_scraper import PerplexityScraper
 from app.config import settings
+from app.utils.llm_extractor import LLMExtractor
 
 
 class ScraperWorker:
@@ -102,6 +103,42 @@ class ScraperWorker:
                 status='completed',
                 raw_html=result.raw_html
             )
+            
+            # LLM-powered extraction (if enabled and brands were mentioned)
+            if settings.LLM_ENABLED and result.brands_mentioned:
+                logger.info("🤖 Starting LLM-powered extraction...")
+                try:
+                    extractor = LLMExtractor()
+                    
+                    # Single LLM call to extract everything
+                    extracted_data = extractor.extract_all_data(
+                        response_text=result.text,
+                        brands_mentioned=result.brands_mentioned,
+                        prompt_text=prompt['text']
+                    )
+                    
+                    # Process each brand's data
+                    for brand_name, brand_data in extracted_data.get('brands', {}).items():
+                        # Save citations
+                        if brand_data.get('citations'):
+                            await db.save_citations(
+                                response_id=response_id,
+                                brand_name=brand_name,
+                                citations=brand_data['citations']
+                            )
+                        
+                        # Save mention context
+                        await db.save_brand_mention(
+                            response_id=response_id,
+                            brand_name=brand_name,
+                            mention_data=brand_data
+                        )
+                    
+                    logger.success(f"✅ LLM extraction complete for {len(extracted_data.get('brands', {}))} brands")
+                    
+                except Exception as llm_error:
+                    logger.error(f"❌ LLM extraction failed (non-fatal): {llm_error}")
+                    # Don't fail the whole process if LLM extraction fails
             
             logger.success(f"✅ Prompt processed successfully")
             logger.success(f"📊 Response: {len(result.text)} chars")
