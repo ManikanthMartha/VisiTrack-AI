@@ -3,6 +3,9 @@ fastapi
 uvicorn[standard]
 python-multipart
 
+# Python 3.13 compatibility (distutils removed)
+setuptools
+
 # Browser Automation (Anti-Detection)
 undetected-chromedriver
 selenium
