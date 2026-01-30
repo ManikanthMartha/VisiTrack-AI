@@ -45,7 +45,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const pathname = usePathname();
 
   const NavLink = ({ item, isChild = false }: { item: NavItem; isChild?: boolean }) => {

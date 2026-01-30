@@ -33,7 +33,7 @@ export function BrandCard({ brand, className, isCompact = false }: BrandCardProp
               isPositive ? 'text-chart-positive' : 'text-chart-negative'
             )}>
               {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              {Math.abs(brand.changePercent)}%
+              {Math.abs(brand.changePercent).toFixed(0)}%
             </div>
           </div>
         </div>
@@ -80,7 +80,7 @@ export function BrandCard({ brand, className, isCompact = false }: BrandCardProp
             isPositive ? 'text-chart-positive' : 'text-chart-negative'
           )}>
             {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {Math.abs(brand.changePercent)}% vs last week
+            {Math.abs(brand.changePercent).toFixed(0)}% vs yesterday
           </div>
         </div>
 

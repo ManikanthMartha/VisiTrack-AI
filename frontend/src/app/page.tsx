@@ -129,7 +129,7 @@ export default function HomePage() {
       <div className="vignette" />
       <Sidebar />
 
-      <main className="ml-[72px] lg:ml-[240px] min-h-screen transition-all duration-300">
+      <main className="ml-[72px] transition-all duration-300">
         <Topbar breadcrumbs={[]} />
 
         <div className="p-4 lg:p-6">

@@ -115,7 +115,7 @@ export function Leaderboard({
               getTrendColor(brand.changePercent)
             )}>
               {getTrendIcon(brand.changePercent)}
-              <span>{Math.abs(brand.changePercent)}%</span>
+              <span>{Math.abs(brand.changePercent).toFixed(0)}%</span>
             </div>
             
             {/* Score */}
