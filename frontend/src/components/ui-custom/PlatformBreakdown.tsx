@@ -10,6 +10,7 @@ interface PlatformScores {
 
 interface PlatformBreakdownProps {
   scores: PlatformScores;
+  competitorScores?: PlatformScores;
   className?: string;
 }
 

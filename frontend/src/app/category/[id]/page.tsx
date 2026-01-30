@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { apiClient, type BrandDetails, type LeaderboardBrand, type TimeSeriesData, type PlatformScore, type Citation, type SentimentBreakdown, type Keyword, type BrandContext } from '@/lib/api';
-import type { FilterState } from '@/types';
+import type { FilterState, TimeSeriesPoint } from '@/types';
 
 export default function CategoryPage() {
   const params = useParams();
@@ -45,6 +45,10 @@ export default function CategoryPage() {
   const [loading, setLoading] = useState(true);
   const [brandLoading, setBrandLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // User data (rank #1 brand)
+  const [userTimeseries, setUserTimeseries] = useState<TimeSeriesData[]>([]);
+  const [userPlatformScores, setUserPlatformScores] = useState<PlatformScore[]>([]);
 
   // Calculate day-over-day change for any brand's timeseries data
   const calculateDayChangeForBrand = (timeseriesData: TimeSeriesData[]): number => {
@@ -124,6 +128,10 @@ export default function CategoryPage() {
         setBrandLoading(true);
         setError(null);
         
+        // Get the user brand (rank #1)
+        const userBrandId = leaderboard[0]?.id;
+        const isViewingUser = selectedBrandId === userBrandId;
+        
         // Fetch all brand data in parallel
         const [details, timeseriesData, platforms, cit, sent, key, ctx] = await Promise.all([
           apiClient.getBrandDetails(selectedBrandId),
@@ -142,6 +150,20 @@ export default function CategoryPage() {
         setSentiment(sent);
         setKeywords(key);
         setContexts(ctx);
+        
+        // If viewing a competitor, also fetch user's data for comparison
+        if (!isViewingUser && userBrandId) {
+          const [userTimeseriesData, userPlatforms] = await Promise.all([
+            apiClient.getBrandTimeseries(userBrandId, 30),
+            apiClient.getBrandPlatformScores(userBrandId)
+          ]);
+          setUserTimeseries(userTimeseriesData);
+          setUserPlatformScores(userPlatforms);
+        } else {
+          // Clear user comparison data when viewing user's own brand
+          setUserTimeseries([]);
+          setUserPlatformScores([]);
+        }
       } catch (err) {
         console.error('Error fetching brand data:', err);
         setError('Failed to load brand details.');
@@ -151,7 +173,7 @@ export default function CategoryPage() {
     };
 
     fetchBrandData();
-  }, [selectedBrandId]);
+  }, [selectedBrandId, leaderboard]);
 
   if (loading) {
     return (
@@ -216,6 +238,45 @@ export default function CategoryPage() {
         </main>
       </div>
     );
+  }
+
+  // Determine if viewing user or competitor
+  const userBrand = leaderboard[0]; // Rank #1 is always the user
+  const isViewingUser = selectedBrandId === userBrand?.id;
+
+  // Prepare user comparison data (when viewing competitor)
+  let userChartData: TimeSeriesPoint[] = [];
+  let userPlatformScoresTransformed: { chatgpt: number; perplexity: number; claude: number; gemini: number } | undefined;
+
+  if (!isViewingUser && userTimeseries.length > 0) {
+    // Transform user timeseries for chart
+    userChartData = userTimeseries.reduce((acc, item) => {
+      const existing = acc.find(d => d.date === item.date);
+      if (existing) {
+        existing.score = Math.max(existing.score, item.daily_visibility_score);
+        existing.mentions += item.mention_count;
+      } else {
+        acc.push({
+          date: item.date,
+          score: item.daily_visibility_score,
+          mentions: item.mention_count,
+          promptCoverage: 0
+        });
+      }
+      return acc;
+    }, [] as { date: string; score: number; mentions: number; promptCoverage: number }[])
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Transform user platform scores
+    userPlatformScoresTransformed = userPlatformScores.reduce((acc, p) => {
+      acc[p.ai_source as 'chatgpt' | 'gemini' | 'perplexity'] = p.platform_visibility_score;
+      return acc;
+    }, {
+      chatgpt: 0,
+      perplexity: 0,
+      claude: 0,
+      gemini: 0
+    } as { chatgpt: number; perplexity: number; claude: number; gemini: number });
   }
 
   // Transform data for components
@@ -368,9 +429,13 @@ export default function CategoryPage() {
                   <BrandCard brand={brandForCard} />
 
                   <VisibilityChart
-                    data={chartData}
-                    title="Brand visibility"
-                    subtitle={`Percentage of AI answers about ${brandDetails.category_name} that mention ${brandDetails.name}`}
+                    data={isViewingUser ? chartData : chartData}
+                    competitorData={isViewingUser ? undefined : userChartData}
+                    title={isViewingUser ? "Your Brand Visibility" : "Competitor vs You"}
+                    subtitle={isViewingUser 
+                      ? `Percentage of AI answers about ${brandDetails.category_name} that mention ${brandDetails.name}`
+                      : `Comparing ${brandDetails.name} (Competitor) with ${userBrand?.name} (You)`
+                    }
                   />
 
                   {/* LLM Extraction: Sentiment Analysis */}
@@ -391,7 +456,10 @@ export default function CategoryPage() {
                   />
 
                   {Object.keys(transformedPlatformScores).some(k => transformedPlatformScores[k as keyof typeof transformedPlatformScores] > 0) && (
-                    <PlatformBreakdown scores={transformedPlatformScores} />
+                    <PlatformBreakdown 
+                      scores={transformedPlatformScores}
+                      competitorScores={isViewingUser ? undefined : userPlatformScoresTransformed}
+                    />
                   )}
 
                   {/* LLM Extraction: Top Citations */}

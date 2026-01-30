@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Legend,
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown } from 'lucide-react';
@@ -15,6 +16,7 @@ import type { TimeSeriesPoint } from '@/types';
 
 interface VisibilityChartProps {
   data: TimeSeriesPoint[];
+  competitorData?: TimeSeriesPoint[];
   title?: string;
   subtitle?: string;
   className?: string;
@@ -24,7 +26,13 @@ interface VisibilityChartProps {
 
 interface CustomTooltipProps {
   active?: boolean;
-  payload?: Array<{ value: number; payload: TimeSeriesPoint }>;
+  payload?: Array<{ 
+    value: number; 
+    payload: TimeSeriesPoint & { competitorScore?: number };
+    dataKey: string;
+    name: string;
+    color: string;
+  }>;
   label?: string;
 }
 
@@ -32,34 +40,59 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || !payload.length) return null;
 
   const data = payload[0].payload;
+  const youData = payload.find(p => p.name === 'You');
+  const competitorDataPoint = payload.find(p => p.name === 'Competitor');
   
   return (
-    <div className="bg-popover border border-border rounded-lg shadow-elevated p-3 min-w-[180px]">
+    <div className="bg-popover border border-border rounded-lg shadow-elevated p-3 min-w-[200px]">
       <p className="text-xs text-muted-foreground mb-2">
         {new Date(label || '').toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
         })}
       </p>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Visibility Score</span>
-          <span className="text-sm font-semibold font-mono-numbers text-accent">
-            {data.score.toFixed(1)}%
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Mentions</span>
-          <span className="text-sm font-medium font-mono-numbers">
-            {data.mentions}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Prompt Coverage</span>
-          <span className="text-sm font-medium font-mono-numbers">
-            {data.promptCoverage.toFixed(1)}%
-          </span>
-        </div>
+      <div className="space-y-2">
+        {youData && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-accent">You</span>
+              <span className="text-sm font-semibold font-mono-numbers text-accent">
+                {youData.value.toFixed(1)}%
+              </span>
+            </div>
+            {!competitorDataPoint && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Mentions</span>
+                <span className="font-mono-numbers">{data.mentions}</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {competitorDataPoint && (
+          <div className="pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Competitor</span>
+              <span className="text-sm font-semibold font-mono-numbers text-muted-foreground">
+                {competitorDataPoint.value.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {youData && competitorDataPoint && (
+          <div className="pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Difference</span>
+              <span className={cn(
+                "text-sm font-semibold font-mono-numbers",
+                youData.value > competitorDataPoint.value ? "text-chart-positive" : "text-chart-negative"
+              )}>
+                {youData.value > competitorDataPoint.value ? '+' : ''}{(youData.value - competitorDataPoint.value).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -67,6 +100,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 
 export function VisibilityChart({
   data,
+  competitorData,
   title = 'Visibility Score',
   subtitle,
   className,
@@ -77,6 +111,15 @@ export function VisibilityChart({
   const previousScore = data[data.length - 8]?.score || 0;
   const changePercent = ((currentScore - previousScore) / previousScore) * 100;
   const isPositive = changePercent >= 0;
+
+  // Merge data with competitor data
+  const mergedData = data.map(point => {
+    const competitorPoint = competitorData?.find(c => c.date === point.date);
+    return {
+      ...point,
+      competitorScore: competitorPoint?.score || 0,
+    };
+  });
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -141,13 +184,17 @@ export function VisibilityChart({
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={data}
+            data={mergedData}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
             <defs>
               <linearGradient id="visibilityGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="hsl(82 78% 55%)" stopOpacity={0.3} />
                 <stop offset="100%" stopColor="hsl(82 78% 55%)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="competitorGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="hsl(220 8% 55%)" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="hsl(220 8% 55%)" stopOpacity={0} />
               </linearGradient>
             </defs>
             
@@ -179,6 +226,16 @@ export function VisibilityChart({
             
             <Tooltip content={<CustomTooltip />} />
             
+            <Legend 
+              verticalAlign="top" 
+              height={36}
+              iconType="line"
+              wrapperStyle={{ paddingBottom: '10px' }}
+              formatter={(value) => (
+                <span className="text-xs text-muted-foreground">{value}</span>
+              )}
+            />
+            
             <ReferenceLine
               y={75}
               stroke="hsl(220 10% 20%)"
@@ -186,12 +243,27 @@ export function VisibilityChart({
               strokeWidth={1}
             />
             
+            {competitorData && competitorData.length > 0 && (
+              <Area
+                type="monotone"
+                dataKey="competitorScore"
+                name="You"
+                stroke="hsl(82 78% 55%)"
+                strokeWidth={2}
+                fill="url(#visibilityGradient)"
+                animationDuration={1500}
+                animationEasing="ease-out"
+              />
+            )}
+            
             <Area
               type="monotone"
               dataKey="score"
-              stroke="hsl(82 78% 55%)"
+              name={competitorData && competitorData.length > 0 ? "Competitor" : "You"}
+              stroke={competitorData && competitorData.length > 0 ? "hsl(220 8% 55%)" : "hsl(82 78% 55%)"}
               strokeWidth={2}
-              fill="url(#visibilityGradient)"
+              strokeDasharray={competitorData && competitorData.length > 0 ? "5 5" : undefined}
+              fill={competitorData && competitorData.length > 0 ? "url(#competitorGradient)" : "url(#visibilityGradient)"}
               animationDuration={1500}
               animationEasing="ease-out"
             />
