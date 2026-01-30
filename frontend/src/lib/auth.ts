@@ -26,7 +26,12 @@ export const auth = betterAuth({
   },
   secret: process.env.BETTER_AUTH_SECRET || "default-secret-change-in-production",
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
+  trustedOrigins: [
+    "http://localhost:3000", 
+    "http://localhost:3001",
+    "https://visitrack-ai.vercel.app",
+    process.env.BETTER_AUTH_URL || ""
+  ].filter(Boolean),
 });
 
 console.log("Better Auth initialized successfully");
