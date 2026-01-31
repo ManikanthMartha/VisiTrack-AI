@@ -1,0 +1,37 @@
+# Server
+PORT=8000
+HOST=0.0.0.0
+ENVIRONMENT=development
+
+# Supabase
+SUPABASE_URL=
+# Use service role key for backend (bypasses RLS)
+SUPABASE_KEY=
+
+# Storage
+STORAGE_PATH=./storage
+LOG_PATH=./logs
+
+# Anti-Detection Settings
+HEADLESS=false
+USE_STEALTH=true
+RANDOM_DELAY_MIN=1
+RANDOM_DELAY_MAX=3
+
+# Rate Limiting
+RATE_LIMIT_DELAY=180  # 3 minutes between requests
+MAX_CONCURRENT_SESSIONS=3
+
+# Oxylabs Proxy Configuration (REQUIRED - Never use direct network)
+OXYLABS_USERNAME=
+OXYLABS_PASSWORD=
+OXYLABS_PROXY_HOST=dc.oxylabs.io
+OXYLABS_PROXY_PORTS=8001,8002,8003,8004,8005
+USE_PROXY=true  # MUST be true for production
+
+# Google AI Studio API Key (for LLM-powered extraction)
+GOOGLE_API_KEY=
+
+# LLM Settings
+LLM_ENABLED=true
+LLM_MODEL=gemini-2.5-flash
